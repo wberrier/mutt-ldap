@@ -55,11 +55,11 @@ def connect():
     protocol = 'ldap'
     if CONFIG.getboolean('connection', 'ssl'):
         protocol = 'ldaps'
-    connection = ldap.initialize(
-        '%s://%s:%s' % (
-            protocol,
-            CONFIG.get('connection', 'server'),
-            CONFIG.get('connection', 'port')))
+    url = '%s://%s:%s' % (
+        protocol,
+        CONFIG.get('connection', 'server'),
+        CONFIG.get('connection', 'port'))
+    connection = ldap.initialize(url)
     connection.bind(
         CONFIG.get('connection', 'user'),
         CONFIG.get('connection', 'password'),
