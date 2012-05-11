@@ -39,6 +39,7 @@ import os.path
 import ConfigParser
 
 import ldap
+import ldap.sasl
 
 
 CONFIG = ConfigParser.SafeConfigParser()
@@ -46,9 +47,11 @@ CONFIG.add_section('connection')
 CONFIG.set('connection', 'server', 'domaincontroller.yourdomain.com')
 CONFIG.set('connection', 'port', '389')  # set to 636 for default over SSL
 CONFIG.set('connection', 'ssl', 'no')
-CONFIG.set('connection', 'user', '')
-CONFIG.set('connection', 'password', '')
 CONFIG.set('connection', 'basedn', 'ou=x co.,dc=example,dc=net')
+CONFIG.add_section('auth')
+CONFIG.set('auth', 'user', '')
+CONFIG.set('auth', 'password', '')
+CONFIG.set('auth', 'gssapi', 'no')
 CONFIG.read(os.path.expanduser('~/.mutt-ldap.rc'))
 
 def connect():
@@ -60,10 +63,14 @@ def connect():
         CONFIG.get('connection', 'server'),
         CONFIG.get('connection', 'port'))
     connection = ldap.initialize(url)
-    connection.bind(
-        CONFIG.get('connection', 'user'),
-        CONFIG.get('connection', 'password'),
-        ldap.AUTH_SIMPLE)
+    if CONFIG.getboolean('auth', 'gssapi'):
+        sasl = ldap.sasl.gssapi()
+        connection.sasl_interactive_bind_s('', sasl)
+    else:
+        connection.bind(
+            CONFIG.get('auth', 'user'),
+            CONFIG.get('auth', 'password'),
+            ldap.AUTH_SIMPLE)
     return connection
 
 def search(query, connection=None):
