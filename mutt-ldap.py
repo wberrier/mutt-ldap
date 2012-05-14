@@ -47,6 +47,7 @@ CONFIG.add_section('connection')
 CONFIG.set('connection', 'server', 'domaincontroller.yourdomain.com')
 CONFIG.set('connection', 'port', '389')  # set to 636 for default over SSL
 CONFIG.set('connection', 'ssl', 'no')
+CONFIG.set('connection', 'starttls', 'no')
 CONFIG.set('connection', 'basedn', 'ou=x co.,dc=example,dc=net')
 CONFIG.add_section('auth')
 CONFIG.set('auth', 'user', '')
@@ -63,6 +64,8 @@ def connect():
         CONFIG.get('connection', 'server'),
         CONFIG.get('connection', 'port'))
     connection = ldap.initialize(url)
+    if CONFIG.getboolean('connection', 'starttls') and protocol == 'ldap':
+        connection.start_tls_s()
     if CONFIG.getboolean('auth', 'gssapi'):
         sasl = ldap.sasl.gssapi()
         connection.sasl_interactive_bind_s('', sasl)
@@ -84,7 +87,7 @@ def search(query, connection=None):
             post = '*'
         filterstr = '(|%s)' % (
             u' '.join([u'(%s=*%s%s)' % (field, query, post)
-                       for field in ['cn', 'rdn', 'uid', 'mail']]))
+                       for field in ['cn', 'uid', 'mail']]))
         r = connection.search_s(
             CONFIG.get('connection', 'basedn'),
             ldap.SCOPE_SUBTREE,
