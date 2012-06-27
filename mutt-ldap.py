@@ -56,6 +56,7 @@ CONFIG.set('auth', 'password', '')
 CONFIG.set('auth', 'gssapi', 'no')
 CONFIG.add_section('query')
 CONFIG.set('query', 'filter', '') # only match entries according to this filter
+CONFIG.set('query', 'search_fields', 'cn displayName uid mail') # fields to wildcard search
 CONFIG.add_section('results')
 CONFIG.set('results', 'optional_column', '') # mutt can display one optional column
 CONFIG.read(os.path.expanduser('~/.mutt-ldap.rc'))
@@ -92,7 +93,7 @@ def search(query, connection=None):
             post = '*'
         filterstr = u'(|{0})'.format(
             u' '.join([u'({0}=*{1}{2})'.format(field, query, post)
-                       for field in ['cn', 'displayName', 'uid', 'mail']]))
+                       for field in CONFIG.get('query', 'search_fields').split()]))
         query_filter = CONFIG.get('query', 'filter')
         if query_filter:
             filterstr = u'(&({0}){1})'.format(query_filter, filterstr)
