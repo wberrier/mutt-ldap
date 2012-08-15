@@ -87,7 +87,7 @@ def search(query, connection=None):
             post = '*'
         filterstr = '(|%s)' % (
             u' '.join([u'(%s=*%s%s)' % (field, query, post)
-                       for field in ['cn', 'uid', 'mail']]))
+                       for field in ['cn', 'displayName', 'uid', 'mail']]))
         r = connection.search_s(
             CONFIG.get('connection', 'basedn'),
             ldap.SCOPE_SUBTREE,
@@ -100,8 +100,9 @@ def search(query, connection=None):
 def format_entry(entry):
     cn,data = entry
     if 'mail' in data:
+        name = data.get('displayName', data['cn'])[-1]
         for m in data['mail']:
-            yield email.utils.formataddr((data['cn'][-1], m))
+            yield email.utils.formataddr((name, m))
 
 
 if __name__ == '__main__':
