@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 #
-# Copyright (C) 2008-2011  W. Trevor King
+# Copyright (C) 2008-2012  W. Trevor King
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -59,7 +59,7 @@ def connect():
     protocol = 'ldap'
     if CONFIG.getboolean('connection', 'ssl'):
         protocol = 'ldaps'
-    url = '%s://%s:%s' % (
+    url = '{}://{}:{}'.format(
         protocol,
         CONFIG.get('connection', 'server'),
         CONFIG.get('connection', 'port'))
@@ -85,8 +85,8 @@ def search(query, connection=None):
         post = ''
         if query:
             post = '*'
-        filterstr = '(|%s)' % (
-            u' '.join([u'(%s=*%s%s)' % (field, query, post)
+        filterstr = u'(|{})'.format(
+            u' '.join([u'({}=*{}{})'.format(field, query, post)
                        for field in ['cn', 'displayName', 'uid', 'mail']]))
         r = connection.search_s(
             CONFIG.get('connection', 'basedn'),
@@ -112,5 +112,5 @@ if __name__ == '__main__':
     entries = search(query)
     addresses = list(itertools.chain(
             *[format_entry(e) for e in sorted(entries)]))
-    print '%d addresses found:' % len(addresses)
-    print '\n'.join(addresses)
+    print('{} addresses found:'.format(len(addresses)))
+    print('\n'.join(addresses))
