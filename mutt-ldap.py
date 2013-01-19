@@ -103,7 +103,9 @@ def format_entry(entry):
     if 'mail' in data:
         name = data.get('displayName', data['cn'])[-1]
         for m in data['mail']:
-            yield email.utils.formataddr((name, m))
+            # http://www.mutt.org/doc/manual/manual-4.html#ss4.5
+            # Describes the format mutt expects: address\tname
+            yield "\t".join([m, name])
 
 
 if __name__ == '__main__':
