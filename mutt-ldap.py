@@ -24,7 +24,7 @@ to your :file:`.muttrc`::
   set query_command = "mutt-ldap.py '%s'"
 
 Search for addresses with `^t`, optionally after typing part of the
-name.  Configure your connection by creating :file:`~/.mutt-ldap.py`
+name.  Configure your connection by creating :file:`~/.mutt-ldap.rc`
 contaning something like::
 
   [connection]
