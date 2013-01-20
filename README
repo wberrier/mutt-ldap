@@ -43,14 +43,14 @@ standard::
 
   $ python setup.py install
 
-or you can just copy ``mutt-ldap.py`` into to your ``PATH``.
+or you can just copy ``mutt_ldap.py`` into to your ``PATH``.
 
 Usage
 =====
 
 Add the following line to your ``~/.muttrc``::
 
-  set query_command = "mutt-ldap.py '%s'"
+  set query_command = "mutt_ldap.py '%s'"
 
 Search for addresses (from Mutt_) with ``^t``, optionally after typing
 part of the name.  Configure your connection by creating
@@ -60,7 +60,7 @@ part of the name.  Configure your connection by creating
   server = myserver.example.net
   basedn = ou=people,dc=example,dc=net
 
-See the ``CONFIG`` options in ``mutt-ldap.py`` for other available
+See the ``CONFIG`` options in ``mutt_ldap.py`` for other available
 settings.
 
 Licence
