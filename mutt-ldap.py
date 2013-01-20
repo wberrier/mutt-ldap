@@ -35,11 +35,11 @@ contaning something like::
 See the `CONFIG` options for other available settings.
 """
 
+import ConfigParser
 import email.utils
 import hashlib
 import itertools
 import os.path
-import ConfigParser
 import pickle
 
 import ldap
