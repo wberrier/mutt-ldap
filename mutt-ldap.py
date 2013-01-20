@@ -59,14 +59,14 @@ CONFIG.set('auth', 'password', '')
 CONFIG.set('auth', 'gssapi', 'no')
 CONFIG.add_section('query')
 CONFIG.set('query', 'filter', '') # only match entries according to this filter
-CONFIG.set('query', 'search_fields', 'cn displayName uid mail') # fields to wildcard search
+CONFIG.set('query', 'search-fields', 'cn displayName uid mail') # fields to wildcard search
 CONFIG.add_section('results')
-CONFIG.set('results', 'optional_column', '') # mutt can display one optional column
+CONFIG.set('results', 'optional-column', '') # mutt can display one optional column
 CONFIG.add_section('cache')
 CONFIG.set('cache', 'enable', 'yes') # enable caching by default
 CONFIG.set('cache', 'path', '~/.mutt-ldap.cache') # cache results here
 CONFIG.set('cache', 'fields', '')  # fields to cache (if empty, setup in the main block)
-#CONFIG.set('cache', 'longevity_days', '14') # TODO: cache results for 14 days by default
+#CONFIG.set('cache', 'longevity-days', '14') # TODO: cache results for 14 days by default
 CONFIG.add_section('system')
 # HACK: Python 2.x support, see http://bugs.python.org/issue2128
 CONFIG.set('system', 'argv-encoding', 'utf-8')
@@ -127,7 +127,7 @@ class LDAPConnection (object):
         post = u''
         if query:
             post = u'*'
-        fields = self.config.get('query', 'search_fields').split()
+        fields = self.config.get('query', 'search-fields').split()
         filterstr = u'(|{0})'.format(
             u' '.join([u'({0}=*{1}{2})'.format(field, query, post) for
                        field in fields]))
@@ -214,7 +214,7 @@ class CachedLDAPConnection (LDAPConnection):
 def format_columns(address, data):
     yield unicode(address, 'utf-8')
     yield unicode(data.get('displayName', data['cn'])[-1], 'utf-8')
-    optional_column = CONFIG.get('results', 'optional_column')
+    optional_column = CONFIG.get('results', 'optional-column')
     if optional_column in data:
         yield unicode(data[optional_column][-1], 'utf-8')
 
@@ -245,7 +245,7 @@ if __name__ == '__main__':
         if not CONFIG.get('cache', 'fields'):
             # setup a reasonable default
             fields = ['mail', 'cn', 'displayName']  # used by format_entry()
-            optional_column = CONFIG.get('results', 'optional_column')
+            optional_column = CONFIG.get('results', 'optional-column')
             if optional_column:
                 fields.append(optional_column)
             CONFIG.set('cache', 'fields', ' '.join(fields))
