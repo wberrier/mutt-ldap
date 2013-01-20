@@ -65,6 +65,7 @@ CONFIG.set('results', 'optional_column', '') # mutt can display one optional col
 CONFIG.add_section('cache')
 CONFIG.set('cache', 'enable', 'yes') # enable caching by default
 CONFIG.set('cache', 'path', '~/.mutt-ldap.cache') # cache results here
+CONFIG.set('cache', 'fields', '')  # fields to cache (if empty, setup in the main block)
 #CONFIG.set('cache', 'longevity_days', '14') # TODO: cache results for 14 days by default
 CONFIG.add_section('system')
 # HACK: Python 2.x support, see http://bugs.python.org/issue2128
@@ -168,8 +169,13 @@ class CachedLDAPConnection (LDAPConnection):
                 yield entry
         else:
             entries = []
+            keys = self.config.get('cache', 'fields').split()
             for entry in super(CachedLDAPConnection, self).search(query=query):
-                entries.append(entry)
+                cn,data = entry
+                # use dict comprehensions in Python >= 2.7, see PEP 274
+                cached_data = dict(
+                    [(key, data[key]) for key in keys if key in data])
+                entries.append((cn, cached_data))
                 yield entry
             self._cache_store(query=query, entries=entries)
 
@@ -236,6 +242,13 @@ if __name__ == '__main__':
 
     if CONFIG.getboolean('cache', 'enable'):
         connection_class = CachedLDAPConnection
+        if not CONFIG.get('cache', 'fields'):
+            # setup a reasonable default
+            fields = ['mail', 'cn', 'displayName']  # used by format_entry()
+            optional_column = CONFIG.get('results', 'optional_column')
+            if optional_column:
+                fields.append(optional_column)
+            CONFIG.set('cache', 'fields', ' '.join(fields))
     else:
         connection_class = LDAPConnection
 
