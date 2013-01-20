@@ -17,23 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""LDAP address searches for Mutt.
-
-Add :file:`mutt-ldap.py` to your ``PATH`` and add the following line
-to your :file:`.muttrc`::
-
-  set query_command = "mutt-ldap.py '%s'"
-
-Search for addresses with `^t`, optionally after typing part of the
-name.  Configure your connection by creating :file:`~/.mutt-ldap.rc`
-contaning something like::
-
-  [connection]
-  server = myserver.example.net
-  basedn = ou=people,dc=example,dc=net
-
-See the `CONFIG` options for other available settings.
-"""
+"LDAP address searches for Mutt"
 
 import ConfigParser as _configparser
 import hashlib as _hashlib

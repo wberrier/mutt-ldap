@@ -1,0 +1,95 @@
+Mutt-LDAP provides an `external address query script`_ for Mutt_ which
+connects to LDAP_ databases using python-ldap_.  It can cache queries
+locally in case your LDAP server is slow or not always available,
+expiring cached queries after a configurable amount of time.
+
+Installation
+============
+
+Packages
+--------
+
+Gentoo
+~~~~~~
+
+I've packaged Mutt-LDAP for Gentoo_.  You need layman_ and my `wtk
+overlay`_.  Install with::
+
+  # emerge -av app-portage/layman
+  # layman --add wtk
+  # emerge -av mail-client/mutt-ldap
+
+Dependencies
+------------
+
+If you're installing by hand or packaging Mutt-LDAP for another
+distribution, you'll need the following dependencies:
+
+============  ================  ===========  ======================
+Package       Purpose           Debian_      Gentoo_
+============  ================  ===========  ======================
+python-ldap_  LDAP connections  python-ldap  dev-python/python-ldap
+============  ================  ===========  ======================
+
+Installing by hand
+------------------
+
+Mutt-LDAP is available as a Git_ repository::
+
+  $ git clone git://tremily.us/mutt-ldap.git
+
+It is also mirrored on GitHub_.  To install the checkout, run the
+standard::
+
+  $ python setup.py install
+
+or you can just copy ``mutt-ldap.py`` into to your ``PATH``.
+
+Usage
+=====
+
+Add the following line to your ``~/.muttrc``::
+
+  set query_command = "mutt-ldap.py '%s'"
+
+Search for addresses (from Mutt_) with ``^t``, optionally after typing
+part of the name.  Configure your connection by creating
+``~/.mutt-ldap.rc`` contaning something like::
+
+  [connection]
+  server = myserver.example.net
+  basedn = ou=people,dc=example,dc=net
+
+See the ``CONFIG`` options in ``mutt-ldap.py`` for other available
+settings.
+
+Licence
+=======
+
+This project is distributed under the `GNU General Public License
+Version 3`_ or greater.
+
+Bugs
+====
+
+Use the `GitHub issue tracker`_ to submit bugs.
+
+Related work
+============
+
+`mutt_ldap_query`_ is a Perl script with a similar purpose.
+
+.. _external address query script:
+   http://www.mutt.org/doc/manual/manual-4.html#ss4.5
+.. _Mutt: http://www.mutt.org/
+.. _LDAP: http://en.wikipedia.org/wiki/Lightweight_Directory_Access_Protocol
+.. _python-ldap: http://www.python-ldap.org/
+.. _Gentoo: http://www.gentoo.org/
+.. _layman: http://layman.sourceforge.net/
+.. _wtk overlay: http://blog.tremily.us/posts/Gentoo_overlay/
+.. _Debian: http://www.debian.org/
+.. _Git: http://git-scm.com/
+.. _GNU General Public License Version 3: http://www.gnu.org/licenses/gpl.html
+.. _GitHub: https://github.com/wking/mutt-ldap
+.. _GitHub issue tracker: https://github.com/wking/mutt-ldap/issues
+.. _mutt_ldap_query: ftp://ftp.mutt.org/pub/mutt/contrib/mutt_ldap_query.README
