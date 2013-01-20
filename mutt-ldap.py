@@ -88,9 +88,9 @@ def connect():
     return connection
 
 def search(query, connection):
-    post = ''
+    post = u''
     if query:
-        post = '*'
+        post = u'*'
     filterstr = u'(|{0})'.format(
         u' '.join([u'({0}=*{1}{2})'.format(field, query, post)
                    for field in CONFIG.get('query', 'search_fields').split()]))
