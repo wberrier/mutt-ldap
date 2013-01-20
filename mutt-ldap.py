@@ -64,7 +64,12 @@ CONFIG.add_section('cache')
 CONFIG.set('cache', 'enable', 'yes') # enable caching by default
 CONFIG.set('cache', 'path', '~/.mutt-ldap.cache') # cache results here
 #CONFIG.set('cache', 'longevity_days', '14') # TODO: cache results for 14 days by default
+CONFIG.add_section('system')
+# HACK: Python 2.x support, see http://bugs.python.org/issue2128
+CONFIG.set('system', 'argv-encoding', 'utf-8')
+
 CONFIG.read(os.path.expanduser('~/.mutt-ldap.rc'))
+
 
 def connect():
     protocol = 'ldap'
@@ -166,6 +171,10 @@ def cache_persist(query, addresses):
 
 if __name__ == '__main__':
     import sys
+
+    # HACK: convert sys.argv to Unicode (not needed in Python 3)
+    argv_encoding = CONFIG.get('system', 'argv-encoding')
+    sys.argv = [unicode(arg, argv_encoding) for arg in sys.argv]
 
     if len(sys.argv) < 2:
         sys.stderr.write('{0}: no search string given\n'.format(sys.argv[0]))
