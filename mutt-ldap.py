@@ -155,6 +155,8 @@ class LDAPConnection (object):
 
 
 class CachedLDAPConnection (LDAPConnection):
+    _cache_version = '{0}.0'.format(__version__)
+
     def connect(self):
         self._load_cache()
         super(CachedLDAPConnection, self).connect()
@@ -183,17 +185,25 @@ class CachedLDAPConnection (LDAPConnection):
 
     def _load_cache(self):
         path = _os_path.expanduser(self.config.get('cache', 'path'))
+        self._cache = {}
         try:
-            self._cache = _pickle.load(open(path, 'rb'))
+            data = _pickle.load(open(path, 'rb'))
         except IOError:  # probably "No such file"
-            self._cache = {}
+            pass
         except (ValueError, KeyError):  # probably a corrupt cache file
-            self._cache = {}
+            pass
+        else:
+            if data.get('version', None) == self._cache_version:
+                self._cache = data.get('queries', {})
         self._cull_cache()
 
     def _save_cache(self):
         path = _os_path.expanduser(self.config.get('cache', 'path'))
-        _pickle.dump(self._cache, open(path, 'wb'))
+        data = {
+            'queries': self._cache,
+            'version': self._cache_version,
+            }
+        _pickle.dump(data, open(path, 'wb'))
 
     def _cache_store(self, query, entries):
         self._cache[self._cache_key(query=query)] = {
