@@ -35,18 +35,16 @@ contaning something like::
 See the `CONFIG` options for other available settings.
 """
 
-import ConfigParser
-import email.utils
-import hashlib
-import itertools
-import os.path
-import pickle
+import ConfigParser as _configparser
+import hashlib as _hashlib
+import os.path as _os_path
+import pickle as _pickle
 
-import ldap
-import ldap.sasl
+import ldap as _ldap
+import ldap.sasl as _ldap_sasl
 
 
-CONFIG = ConfigParser.SafeConfigParser()
+CONFIG = _configparser.SafeConfigParser()
 CONFIG.add_section('connection')
 CONFIG.set('connection', 'server', 'domaincontroller.yourdomain.com')
 CONFIG.set('connection', 'port', '389')  # set to 636 for default over SSL
@@ -71,7 +69,7 @@ CONFIG.add_section('system')
 # HACK: Python 2.x support, see http://bugs.python.org/issue2128
 CONFIG.set('system', 'argv-encoding', 'utf-8')
 
-CONFIG.read(os.path.expanduser('~/.mutt-ldap.rc'))
+CONFIG.read(_os_path.expanduser('~/.mutt-ldap.rc'))
 
 
 class LDAPConnection (object):
@@ -102,18 +100,18 @@ class LDAPConnection (object):
             protocol,
             self.config.get('connection', 'server'),
             self.config.get('connection', 'port'))
-        self.connection = ldap.initialize(url)
+        self.connection = _ldap.initialize(url)
         if (self.config.getboolean('connection', 'starttls') and
                 protocol == 'ldap'):
             self.connection.start_tls_s()
         if self.config.getboolean('auth', 'gssapi'):
-            sasl = ldap.sasl.gssapi()
+            sasl = _ldap_sasl.gssapi()
             self.connection.sasl_interactive_bind_s('', sasl)
         else:
             self.connection.bind(
                 self.config.get('auth', 'user'),
                 self.config.get('auth', 'password'),
-                ldap.AUTH_SIMPLE)
+                _ldap.AUTH_SIMPLE)
 
     def unbind(self):
         if self.connection is None:
@@ -136,14 +134,14 @@ class LDAPConnection (object):
             filterstr = u'(&({0}){1})'.format(query_filter, filterstr)
         msg_id = self.connection.search(
             self.config.get('connection', 'basedn'),
-            ldap.SCOPE_SUBTREE,
+            _ldap.SCOPE_SUBTREE,
             filterstr.encode('utf-8'))
         res_type = None
-        while res_type != ldap.RES_SEARCH_RESULT:
+        while res_type != _ldap.RES_SEARCH_RESULT:
             try:
                 res_type, res_data = self.connection.result(
                     msg_id, all=False, timeout=0)
-            except ldap.ADMINLIMIT_EXCEEDED:
+            except _ldap.ADMINLIMIT_EXCEEDED:
                 #print "Partial results"
                 break
             if res_data:
@@ -180,17 +178,17 @@ class CachedLDAPConnection (LDAPConnection):
             self._cache_store(query=query, entries=entries)
 
     def _load_cache(self):
-        path = os.path.expanduser(self.config.get('cache', 'path'))
+        path = _os_path.expanduser(self.config.get('cache', 'path'))
         try:
-            self._cache = pickle.load(open(path, 'rb'))
+            self._cache = _pickle.load(open(path, 'rb'))
         except IOError:  # probably "No such file"
             self._cache = {}
         except (ValueError, KeyError):  # probably a corrupt cache file
             self._cache = {}
 
     def _save_cache(self):
-        path = os.path.expanduser(self.config.get('cache', 'path'))
-        pickle.dump(self._cache, open(path, 'wb'))
+        path = _os_path.expanduser(self.config.get('cache', 'path'))
+        _pickle.dump(self._cache, open(path, 'wb'))
 
     def _cache_store(self, query, entries):
         self._cache[self._cache_key(query=query)] = entries
@@ -207,8 +205,8 @@ class CachedLDAPConnection (LDAPConnection):
     def _config_id(self):
         """Return a unique ID representing the current configuration
         """
-        config_string = pickle.dumps(self.config)
-        return hashlib.sha1(config_string).hexdigest()
+        config_string = _pickle.dumps(self.config)
+        return _hashlib.sha1(config_string).hexdigest()
 
 
 def format_columns(address, data):
