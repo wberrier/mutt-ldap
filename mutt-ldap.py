@@ -121,11 +121,11 @@ def search(query, connection):
                 yield entry
 
 def format_columns(address, data):
-    yield address
-    yield data.get('displayName', data['cn'])[-1]
+    yield unicode(address, 'utf-8')
+    yield unicode(data.get('displayName', data['cn'])[-1], 'utf-8')
     optional_column = CONFIG.get('results', 'optional_column')
     if optional_column in data:
-        yield data[optional_column][-1]
+        yield unicode(data[optional_column][-1], 'utf-8')
 
 def format_entry(entry):
     cn,data = entry
@@ -133,7 +133,7 @@ def format_entry(entry):
         for m in data['mail']:
             # http://www.mutt.org/doc/manual/manual-4.html#ss4.5
             # Describes the format mutt expects: address\tname
-            yield "\t".join(format_columns(m, data))
+            yield u'\t'.join(format_columns(m, data))
 
 def cache_filename(query):
     # TODO: is the query filename safe?
@@ -197,5 +197,5 @@ if __name__ == '__main__':
             if connection:
                 connection.unbind()
 
-    print('{0} addresses found:'.format(len(addresses)))
-    print('\n'.join(addresses))
+    print(u'{0} addresses found:'.format(len(addresses)))
+    print(u'\n'.join(addresses))
