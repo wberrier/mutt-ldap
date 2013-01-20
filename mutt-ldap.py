@@ -56,6 +56,8 @@ CONFIG.set('auth', 'password', '')
 CONFIG.set('auth', 'gssapi', 'no')
 CONFIG.add_section('query')
 CONFIG.set('query', 'filter', '') # only match entries according to this filter
+CONFIG.add_section('results')
+CONFIG.set('results', 'optional_column', '') # mutt can display one optional column
 CONFIG.read(os.path.expanduser('~/.mutt-ldap.rc'))
 
 def connect():
@@ -103,14 +105,20 @@ def search(query, connection=None):
             connection.unbind()
     return r
 
+def format_columns(address, data):
+    yield address
+    yield data.get('displayName', data['cn'])[-1]
+    optional_column = CONFIG.get('results', 'optional_column')
+    if optional_column in data:
+        yield data[optional_column][-1]
+
 def format_entry(entry):
     cn,data = entry
     if 'mail' in data:
-        name = data.get('displayName', data['cn'])[-1]
         for m in data['mail']:
             # http://www.mutt.org/doc/manual/manual-4.html#ss4.5
             # Describes the format mutt expects: address\tname
-            yield "\t".join([m, name])
+            yield "\t".join(format_columns(m, data))
 
 
 if __name__ == '__main__':
