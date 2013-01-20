@@ -167,12 +167,14 @@ class CachedLDAPConnection (LDAPConnection):
     _cache_version = '{0}.0'.format(__version__)
 
     def connect(self):
+        # delay LDAP connection until we actually need it
         self._load_cache()
-        super(CachedLDAPConnection, self).connect()
 
     def unbind(self):
-        super(CachedLDAPConnection, self).unbind()
-        self._save_cache()
+        if self.connection:
+            super(CachedLDAPConnection, self).unbind()
+        if self._cache:
+            self._save_cache()
 
     def search(self, query):
         cache_hit, entries = self._cache_lookup(query=query)
@@ -182,6 +184,8 @@ class CachedLDAPConnection (LDAPConnection):
             for entry in entries:
                 yield entry
         else:
+            if self.connection is None:
+                super(CachedLDAPConnection, self).connect()
             entries = []
             keys = self.config.get('cache', 'fields').split()
             for entry in super(CachedLDAPConnection, self).search(query=query):
