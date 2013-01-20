@@ -101,8 +101,18 @@ def search(query, connection):
         CONFIG.get('connection', 'basedn'),
         ldap.SCOPE_SUBTREE,
         filterstr.encode('utf-8'))
-    return msg_id
-
+    res_type = None
+    while res_type != ldap.RES_SEARCH_RESULT:
+        try:
+            res_type, res_data = connection.result(
+                msg_id, all=False, timeout=0)
+        except ldap.ADMINLIMIT_EXCEEDED:
+            #print "Partial results"
+            break
+        if res_data:
+            # use `yield from res_data` in Python >= 3.3, see PEP 380
+            for entry in res_data:
+                yield entry
 
 def format_columns(address, data):
     yield address
@@ -166,24 +176,12 @@ if __name__ == '__main__':
     (cache_hit, addresses) = cache_lookup(query)
 
     if not cache_hit:
+        connection = None
         try:
             connection = connect()
-            msg_id = search(query, connection)
-
-            # wacky, but allows partial results
-            while True:
-                try:
-                    res_type, res_data = connection.result(msg_id, 0)
-                except ldap.ADMINLIMIT_EXCEEDED:
-                    #print "Partial results"
-                    break
-                # last result will have this set
-                if res_type == ldap.RES_SEARCH_RESULT:
-                    break
-
-                addresses += [entry for entry in format_entry(res_data[-1])]
-
-            # Cache results for next lookup
+            entries = search(query=query, connection=connection)
+            for entry in entries:
+                addresses.extend(format_entry(entry))
             cache_persist(query, addresses)
         finally:
             if connection:
