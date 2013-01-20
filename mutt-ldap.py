@@ -1,7 +1,8 @@
 #!/usr/bin/env python2
 #
-# Copyright (C) 2008-2012  W. Trevor King
+# Copyright (C) 2008-2013  W. Trevor King
 # Copyright (C) 2012-2013  Wade Berrier
+# Copyright (C) 2012       Niels de Vos
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
