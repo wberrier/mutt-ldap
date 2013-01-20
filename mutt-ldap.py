@@ -39,6 +39,7 @@ import ConfigParser as _configparser
 import hashlib as _hashlib
 import os.path as _os_path
 import pickle as _pickle
+import time as _time
 
 import ldap as _ldap
 import ldap.sasl as _ldap_sasl
@@ -64,7 +65,7 @@ CONFIG.add_section('cache')
 CONFIG.set('cache', 'enable', 'yes') # enable caching by default
 CONFIG.set('cache', 'path', '~/.mutt-ldap.cache') # cache results here
 CONFIG.set('cache', 'fields', '')  # fields to cache (if empty, setup in the main block)
-#CONFIG.set('cache', 'longevity-days', '14') # TODO: cache results for 14 days by default
+CONFIG.set('cache', 'longevity-days', '14') # TODO: cache results for 14 days by default
 CONFIG.add_section('system')
 # HACK: Python 2.x support, see http://bugs.python.org/issue2128
 CONFIG.set('system', 'argv-encoding', 'utf-8')
@@ -185,19 +186,23 @@ class CachedLDAPConnection (LDAPConnection):
             self._cache = {}
         except (ValueError, KeyError):  # probably a corrupt cache file
             self._cache = {}
+        self._cull_cache()
 
     def _save_cache(self):
         path = _os_path.expanduser(self.config.get('cache', 'path'))
         _pickle.dump(self._cache, open(path, 'wb'))
 
     def _cache_store(self, query, entries):
-        self._cache[self._cache_key(query=query)] = entries
+        self._cache[self._cache_key(query=query)] = {
+            'entries': entries,
+            'time': _time.time(),
+            }
 
     def _cache_lookup(self, query):
-        entries = self._cache.get(self._cache_key(query=query), None)
-        if entries is None:
-            return (False, entries)
-        return (True, entries)
+        data = self._cache.get(self._cache_key(query=query), None)
+        if data is None:
+            return (False, data)
+        return (True, data['entries'])
 
     def _cache_key(self, query):
         return (self._config_id(), query)
@@ -207,6 +212,14 @@ class CachedLDAPConnection (LDAPConnection):
         """
         config_string = _pickle.dumps(self.config)
         return _hashlib.sha1(config_string).hexdigest()
+
+    def _cull_cache(self):
+        cull_days = self.config.getint('cache', 'longevity-days')
+        day_seconds = 24*60*60
+        expire = _time.time() - cull_days * day_seconds
+        for key in list(self._cache.keys()):  # cull the cache
+            if self._cache[key]['time'] < expire:
+                self._cache.pop(key)
 
 
 def format_columns(address, data):
