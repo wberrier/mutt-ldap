@@ -45,6 +45,9 @@ import ldap as _ldap
 import ldap.sasl as _ldap_sasl
 
 
+__version__ = '0.1'
+
+
 CONFIG = _configparser.SafeConfigParser()
 CONFIG.add_section('connection')
 CONFIG.set('connection', 'server', 'domaincontroller.yourdomain.com')
