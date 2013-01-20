@@ -37,6 +37,7 @@ See the `CONFIG` options for other available settings.
 
 import ConfigParser as _configparser
 import hashlib as _hashlib
+import json as _json
 import os.path as _os_path
 import pickle as _pickle
 import time as _time
@@ -187,7 +188,7 @@ class CachedLDAPConnection (LDAPConnection):
         path = _os_path.expanduser(self.config.get('cache', 'path'))
         self._cache = {}
         try:
-            data = _pickle.load(open(path, 'rb'))
+            data = _json.load(open(path, 'rb'))
         except IOError:  # probably "No such file"
             pass
         except (ValueError, KeyError):  # probably a corrupt cache file
@@ -203,7 +204,9 @@ class CachedLDAPConnection (LDAPConnection):
             'queries': self._cache,
             'version': self._cache_version,
             }
-        _pickle.dump(data, open(path, 'wb'))
+        with open(path, 'wb') as f:
+            _json.dump(data, f, indent=2, separators=(',', ': '))
+            f.write('\n'.encode('utf-8'))
 
     def _cache_store(self, query, entries):
         self._cache[self._cache_key(query=query)] = {
@@ -218,7 +221,7 @@ class CachedLDAPConnection (LDAPConnection):
         return (True, data['entries'])
 
     def _cache_key(self, query):
-        return (self._config_id(), query)
+        return str((self._config_id(), query))
 
     def _config_id(self):
         """Return a unique ID representing the current configuration
@@ -235,12 +238,17 @@ class CachedLDAPConnection (LDAPConnection):
                 self._cache.pop(key)
 
 
+def _decode_query_data(obj):
+    if isinstance(obj, unicode):  # e.g. cached JSON data
+        return obj
+    return unicode(obj, 'utf-8')
+
 def format_columns(address, data):
-    yield unicode(address, 'utf-8')
-    yield unicode(data.get('displayName', data['cn'])[-1], 'utf-8')
+    yield _decode_query_data(address)
+    yield _decode_query_data(data.get('displayName', data['cn'])[-1])
     optional_column = CONFIG.get('results', 'optional-column')
     if optional_column in data:
-        yield unicode(data[optional_column][-1], 'utf-8')
+        yield _decode_query_data(data[optional_column][-1])
 
 def format_entry(entry):
     cn,data = entry
