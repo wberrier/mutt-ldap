@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 #
 # Copyright (C) 2008-2012  W. Trevor King
+# Copyright (C) 2012-2013  Wade Berrier
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,7 +24,7 @@ to your :file:`.muttrc`::
   set query_command = "mutt-ldap.py '%s'"
 
 Search for addresses with `^t`, optionally after typing part of the
-name.  Configure your connection by creating :file:`~/.mutt-ldap.py`
+name.  Configure your connection by creating :file:`~/.mutt-ldap.rc`
 contaning something like::
 
   [connection]
@@ -37,6 +38,7 @@ import email.utils
 import itertools
 import os.path
 import ConfigParser
+import pickle
 
 import ldap
 import ldap.sasl
@@ -53,13 +55,22 @@ CONFIG.add_section('auth')
 CONFIG.set('auth', 'user', '')
 CONFIG.set('auth', 'password', '')
 CONFIG.set('auth', 'gssapi', 'no')
+CONFIG.add_section('query')
+CONFIG.set('query', 'filter', '') # only match entries according to this filter
+CONFIG.set('query', 'search_fields', 'cn displayName uid mail') # fields to wildcard search
+CONFIG.add_section('results')
+CONFIG.set('results', 'optional_column', '') # mutt can display one optional column
+CONFIG.add_section('cache')
+CONFIG.set('cache', 'enable', 'yes') # enable caching by default
+CONFIG.set('cache', 'path', '~/.mutt-ldap.cache') # cache results here
+#CONFIG.set('cache', 'longevity_days', '14') # TODO: cache results for 14 days by default
 CONFIG.read(os.path.expanduser('~/.mutt-ldap.rc'))
 
 def connect():
     protocol = 'ldap'
     if CONFIG.getboolean('connection', 'ssl'):
         protocol = 'ldaps'
-    url = '{}://{}:{}'.format(
+    url = '{0}://{1}:{2}'.format(
         protocol,
         CONFIG.get('connection', 'server'),
         CONFIG.get('connection', 'port'))
@@ -76,41 +87,107 @@ def connect():
             ldap.AUTH_SIMPLE)
     return connection
 
-def search(query, connection=None):
-    local_connection = False
-    try:
-        if not connection:
-            local_connection = True
-            connection = connect()
-        post = ''
-        if query:
-            post = '*'
-        filterstr = u'(|{})'.format(
-            u' '.join([u'({}=*{}{})'.format(field, query, post)
-                       for field in ['cn', 'displayName', 'uid', 'mail']]))
-        r = connection.search_s(
-            CONFIG.get('connection', 'basedn'),
-            ldap.SCOPE_SUBTREE,
-            filterstr.encode('utf-8'))
-    finally:
-        if local_connection and connection:
-            connection.unbind()
-    return r
+def search(query, connection):
+    post = ''
+    if query:
+        post = '*'
+    filterstr = u'(|{0})'.format(
+        u' '.join([u'({0}=*{1}{2})'.format(field, query, post)
+                   for field in CONFIG.get('query', 'search_fields').split()]))
+    query_filter = CONFIG.get('query', 'filter')
+    if query_filter:
+        filterstr = u'(&({0}){1})'.format(query_filter, filterstr)
+    msg_id = connection.search(
+        CONFIG.get('connection', 'basedn'),
+        ldap.SCOPE_SUBTREE,
+        filterstr.encode('utf-8'))
+    return msg_id
+
+
+def format_columns(address, data):
+    yield address
+    yield data.get('displayName', data['cn'])[-1]
+    optional_column = CONFIG.get('results', 'optional_column')
+    if optional_column in data:
+        yield data[optional_column][-1]
 
 def format_entry(entry):
     cn,data = entry
     if 'mail' in data:
-        name = data.get('displayName', data['cn'])[-1]
         for m in data['mail']:
-            yield email.utils.formataddr((name, m))
+            # http://www.mutt.org/doc/manual/manual-4.html#ss4.5
+            # Describes the format mutt expects: address\tname
+            yield "\t".join(format_columns(m, data))
 
+def cache_filename(query):
+    # TODO: is the query filename safe?
+    return os.path.expanduser(CONFIG.get('cache', 'path')) + os.sep + query
+
+def settings_match(serialized_settings):
+    """Check to make sure the settings are the same for this cache"""
+    return pickle.dumps(CONFIG) == serialized_settings
+
+def cache_lookup(query):
+    hit = False
+    addresses = []
+    if CONFIG.get('cache', 'enable') == 'yes':
+        cache_file = cache_filename(query)
+        cache_dir = os.path.dirname(cache_file)
+        if not os.path.exists(cache_dir): os.mkdir(cache_dir)
+
+        # TODO: validate longevity setting
+
+        if os.path.exists(cache_file):
+            cache_info = pickle.loads(open(cache_file).read())
+            if settings_match(cache_info['settings']):
+                hit = True
+                addresses = cache_info['addresses']
+
+    return hit, addresses
+
+def cache_persist(query, addresses):
+    cache_info = {
+        'settings':  pickle.dumps(CONFIG),
+        'addresses': addresses
+        }
+    fd = open(cache_filename(query), 'w')
+    pickle.dump(cache_info, fd)
+    fd.close()
 
 if __name__ == '__main__':
     import sys
 
+    if len(sys.argv) < 2:
+        sys.stderr.write('{0}: no search string given\n'.format(sys.argv[0]))
+        sys.exit(1)
+
     query = unicode(' '.join(sys.argv[1:]), 'utf-8')
-    entries = search(query)
-    addresses = list(itertools.chain(
-            *[format_entry(e) for e in sorted(entries)]))
-    print('{} addresses found:'.format(len(addresses)))
+
+    (cache_hit, addresses) = cache_lookup(query)
+
+    if not cache_hit:
+        try:
+            connection = connect()
+            msg_id = search(query, connection)
+
+            # wacky, but allows partial results
+            while True:
+                try:
+                    res_type, res_data = connection.result(msg_id, 0)
+                except ldap.ADMINLIMIT_EXCEEDED:
+                    #print "Partial results"
+                    break
+                # last result will have this set
+                if res_type == ldap.RES_SEARCH_RESULT:
+                    break
+
+                addresses += [entry for entry in format_entry(res_data[-1])]
+
+            # Cache results for next lookup
+            cache_persist(query, addresses)
+        finally:
+            if connection:
+                connection.unbind()
+
+    print('{0} addresses found:'.format(len(addresses)))
     print('\n'.join(addresses))
