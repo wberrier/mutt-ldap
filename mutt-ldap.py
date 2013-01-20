@@ -62,7 +62,7 @@ def connect():
     protocol = 'ldap'
     if CONFIG.getboolean('connection', 'ssl'):
         protocol = 'ldaps'
-    url = '{}://{}:{}'.format(
+    url = '{0}://{1}:{2}'.format(
         protocol,
         CONFIG.get('connection', 'server'),
         CONFIG.get('connection', 'port'))
@@ -88,12 +88,12 @@ def search(query, connection=None):
         post = ''
         if query:
             post = '*'
-        filterstr = u'(|{})'.format(
-            u' '.join([u'({}=*{}{})'.format(field, query, post)
+        filterstr = u'(|{0})'.format(
+            u' '.join([u'({0}=*{1}{2})'.format(field, query, post)
                        for field in ['cn', 'displayName', 'uid', 'mail']]))
         query_filter = CONFIG.get('query', 'filter')
         if query_filter:
-            filterstr = u'(&({}){})'.format(query_filter, filterstr)
+            filterstr = u'(&({0}){1})'.format(query_filter, filterstr)
         r = connection.search_s(
             CONFIG.get('connection', 'basedn'),
             ldap.SCOPE_SUBTREE,
@@ -120,5 +120,5 @@ if __name__ == '__main__':
     entries = search(query)
     addresses = list(itertools.chain(
             *[format_entry(e) for e in sorted(entries)]))
-    print('{} addresses found:'.format(len(addresses)))
+    print('{0} addresses found:'.format(len(addresses)))
     print('\n'.join(addresses))
