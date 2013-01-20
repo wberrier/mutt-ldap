@@ -38,6 +38,7 @@ See the `CONFIG` options for other available settings.
 import ConfigParser as _configparser
 import hashlib as _hashlib
 import json as _json
+import logging as _logging
 import os.path as _os_path
 import pickle as _pickle
 import time as _time
@@ -48,6 +49,10 @@ import ldap.sasl as _ldap_sasl
 
 __version__ = '0.1'
 
+
+LOG = _logging.getLogger('mutt-ldap')
+LOG.addHandler(_logging.StreamHandler())
+LOG.setLevel(_logging.ERROR)
 
 CONFIG = _configparser.SafeConfigParser()
 CONFIG.add_section('connection')
@@ -105,6 +110,7 @@ class LDAPConnection (object):
             protocol,
             self.config.get('connection', 'server'),
             self.config.get('connection', 'port'))
+        LOG.info(u'connect to LDAP server at {0}'.format(url))
         self.connection = _ldap.initialize(url)
         if (self.config.getboolean('connection', 'starttls') and
                 protocol == 'ldap'):
@@ -121,6 +127,7 @@ class LDAPConnection (object):
     def unbind(self):
         if self.connection is None:
             raise RuntimeError('not connected to an LDAP server')
+        LOG.info(u'unbind from LDAP server')
         self.connection.unbind()
         self.connection = None
 
@@ -137,6 +144,7 @@ class LDAPConnection (object):
         query_filter = self.config.get('query', 'filter')
         if query_filter:
             filterstr = u'(&({0}){1})'.format(query_filter, filterstr)
+        LOG.info(u'search for {0}'.format(filterstr))
         msg_id = self.connection.search(
             self.config.get('connection', 'basedn'),
             _ldap.SCOPE_SUBTREE,
@@ -146,8 +154,8 @@ class LDAPConnection (object):
             try:
                 res_type, res_data = self.connection.result(
                     msg_id, all=False, timeout=0)
-            except _ldap.ADMINLIMIT_EXCEEDED:
-                #print "Partial results"
+            except _ldap.ADMINLIMIT_EXCEEDED as e:
+                LOG.warn(u'could not handle query results: {0}'.format(e))
                 break
             if res_data:
                 # use `yield from res_data` in Python >= 3.3, see PEP 380
@@ -169,6 +177,7 @@ class CachedLDAPConnection (LDAPConnection):
     def search(self, query):
         cache_hit, entries = self._cache_lookup(query=query)
         if cache_hit:
+            LOG.info(u'return cached entries for {0}'.format(query))
             # use `yield from res_data` in Python >= 3.3, see PEP 380
             for entry in entries:
                 yield entry
@@ -186,20 +195,26 @@ class CachedLDAPConnection (LDAPConnection):
 
     def _load_cache(self):
         path = _os_path.expanduser(self.config.get('cache', 'path'))
+        LOG.info(u'load cache from {0}'.format(path))
         self._cache = {}
         try:
             data = _json.load(open(path, 'rb'))
-        except IOError:  # probably "No such file"
-            pass
-        except (ValueError, KeyError):  # probably a corrupt cache file
-            pass
+        except IOError as e:  # probably "No such file"
+            LOG.warn(u'error reading cache: {0}'.format(e))
+        except (ValueError, KeyError) as e:  # probably a corrupt cache file
+            LOG.warn(u'error parsing cache: {0}'.format(e))
         else:
-            if data.get('version', None) == self._cache_version:
+            version = data.get('version', None)
+            if version == self._cache_version:
                 self._cache = data.get('queries', {})
+            else:
+                LOG.debug(u'drop outdated local cache {0} != {1}'.format(
+                        version, self._cache_version))
         self._cull_cache()
 
     def _save_cache(self):
         path = _os_path.expanduser(self.config.get('cache', 'path'))
+        LOG.info(u'save cache to {0}'.format(path))
         data = {
             'queries': self._cache,
             'version': self._cache_version,
@@ -235,6 +250,7 @@ class CachedLDAPConnection (LDAPConnection):
         expire = _time.time() - cull_days * day_seconds
         for key in list(self._cache.keys()):  # cull the cache
             if self._cache[key]['time'] < expire:
+                LOG.debug('cull entry from cache: {0}'.format(key))
                 self._cache.pop(key)
 
 
