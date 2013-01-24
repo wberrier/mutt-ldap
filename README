@@ -25,11 +25,12 @@ Dependencies
 If you're installing by hand or packaging Mutt-LDAP for another
 distribution, you'll need the following dependencies:
 
-============  ================  ===========  ======================
-Package       Purpose           Debian_      Gentoo_
-============  ================  ===========  ======================
-python-ldap_  LDAP connections  python-ldap  dev-python/python-ldap
-============  ================  ===========  ======================
+============  ====================  ===========  ======================
+Package       Purpose               Debian_      Gentoo_
+============  ====================  ===========  ======================
+python-ldap_  LDAP connections      python-ldap  dev-python/python-ldap
+PyXDG_        Optional XDG support  python-xdg   dev-python/pyxdg
+============  ====================  ===========  ======================
 
 Installing by hand
 ------------------
@@ -54,14 +55,22 @@ Add the following line to your ``~/.muttrc``::
 
 Search for addresses (from Mutt_) with ``^t``, optionally after typing
 part of the name.  Configure your connection by creating
-``~/.mutt-ldap.rc`` containing something like::
+``$XDG_CONFIG_HOME/mutt-ldap.cfg`` containing something like::
 
   [connection]
   server = myserver.example.net
   basedn = ou=people,dc=example,dc=net
 
+The query cache (enabled by default) will be created at
+``$XDG_DATA_HOME/mutt-ldap.json``, unless overriden by an explicit
+``cache.path`` setting.
+
 See the ``CONFIG`` options in ``mutt_ldap.py`` for other available
-settings.
+settings.  See the `XDG Base Directory Specification`_ for more
+details on configuration and cache file locations.  If the ``xdg``
+module supplied by PyXDG_ is not available, the default configuration
+path falls back on ``~/.config/mutt-ldap.cfg`` and the default cache
+path falls back on ``~/.cache/mutt-ldap.json``.
 
 Licence
 =======
@@ -88,7 +97,10 @@ Related work
 .. _layman: http://layman.sourceforge.net/
 .. _wtk overlay: http://blog.tremily.us/posts/Gentoo_overlay/
 .. _Debian: http://www.debian.org/
+.. _PyXDG: http://freedesktop.org/wiki/Software/pyxdg
 .. _Git: http://git-scm.com/
+.. _XDG Base Directory Specification:
+   http://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html
 .. _GNU General Public License Version 3: http://www.gnu.org/licenses/gpl.html
 .. _GitHub: https://github.com/wking/mutt-ldap
 .. _GitHub issue tracker: https://github.com/wking/mutt-ldap/issues

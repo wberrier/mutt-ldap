@@ -33,6 +33,12 @@ import time as _time
 import ldap as _ldap
 import ldap.sasl as _ldap_sasl
 
+_xdg_import_error = None
+try:
+    import xdg.BaseDirectory as _xdg_basedirectory
+except ImportError as _xdg_import_error:
+    _xdg_basedirectory = None
+
 
 __version__ = '0.1'
 
@@ -44,9 +50,11 @@ LOG.setLevel(_logging.ERROR)
 
 class Config (_configparser.SafeConfigParser):
     def load(self):
-        read_configfiles = self.read(_os_path.expanduser('~/.mutt-ldap.rc'))
+        config_paths = self._get_config_paths()
+        LOG.info(u'load configuration from {0}'.format(config_paths))
+        read_config_paths = self.read(config_paths)
         self._setup_defaults()
-        LOG.info(u'loaded configuration from {0}'.format(read_configfiles))
+        LOG.info(u'loaded configuration from {0}'.format(read_config_paths))
 
     def get_connection_class(self):
         if self.getboolean('cache', 'enable'):
@@ -76,6 +84,8 @@ class Config (_configparser.SafeConfigParser):
         _sys.argv = [unicode(arg, argv_encoding) for arg in _sys.argv]
 
     def _setup_cache_defaults(self):
+        if not self.get('cache', 'path'):
+            self.set('cache', 'path', self._get_cache_path())
         if not self.get('cache', 'fields'):
             # setup a reasonable default
             fields = ['mail', 'cn', 'displayName']  # used by format_entry()
@@ -83,6 +93,34 @@ class Config (_configparser.SafeConfigParser):
             if optional_column:
                 fields.append(optional_column)
             self.set('cache', 'fields', ' '.join(fields))
+
+    def _get_config_paths(self):
+        "Get configuration file paths"
+        if _xdg_basedirectory:
+            paths = list(reversed(list(
+                        _xdg_basedirectory.load_config_paths(''))))
+            if not paths:  # setup something for a useful log message
+                paths.append(_xdg_basedirectory.save_config_path(''))
+        else:
+            self._log_xdg_import_error()
+            paths = [_os_path.expanduser(_os_path.join('~', '.config'))]
+        return [_os_path.join(path, 'mutt-ldap.cfg') for path in paths]
+
+    def _get_cache_path(self):
+        "Get the cache file path"
+        if _xdg_basedirectory:
+            path = _xdg_basedirectory.save_cache_path('')
+        else:
+            self._log_xdg_import_error()
+            path = _os_path.expanduser(_os_path.join('~', '.cache'))
+        return _os_path.join(path, 'mutt-ldap.json')
+
+    def _log_xdg_import_error(self):
+        global _xdg_import_error
+        if _xdg_import_error:
+            LOG.error(u'could not import xdg.BaseDirectory')
+            LOG.error(_xdg_import_error)
+            _xdg_import_error = None
 
 
 CONFIG = Config()
@@ -103,7 +141,7 @@ CONFIG.add_section('results')
 CONFIG.set('results', 'optional-column', '') # mutt can display one optional column
 CONFIG.add_section('cache')
 CONFIG.set('cache', 'enable', 'yes') # enable caching by default
-CONFIG.set('cache', 'path', '~/.mutt-ldap.cache') # cache results here
+CONFIG.set('cache', 'path', '') # cache results here, defaults to XDG
 CONFIG.set('cache', 'fields', '')  # fields to cache (if empty, setup in the main block)
 CONFIG.set('cache', 'longevity-days', '14') # TODO: cache results for 14 days by default
 CONFIG.add_section('system')
