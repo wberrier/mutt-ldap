@@ -287,8 +287,7 @@ if __name__ == '__main__':
     LOG.info(u'loaded configuration from {0}'.format(read_configfiles))
 
     if len(_sys.argv) < 2:
-        _sys.stderr.write(
-            u'{0}: no search string given\n'.format(_sys.argv[0]))
+        LOG.error(u'{0}: no search string given'.format(_sys.argv[0]))
         _sys.exit(1)
 
     query = u' '.join(_sys.argv[1:])
