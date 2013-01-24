@@ -276,9 +276,10 @@ if __name__ == '__main__':
             'system', key,
             CONFIG.get('system', key, raw=True) or default_encoding)
 
-    # HACK: convert sys.stdout to Unicode (not needed in Python 3)
+    # HACK: convert sys.std{out,err} to Unicode (not needed in Python 3)
     output_encoding = CONFIG.get('system', 'output-encoding')
     _sys.stdout = _codecs.getwriter(output_encoding)(_sys.stdout)
+    _sys.stderr = _codecs.getwriter(output_encoding)(_sys.stderr)
 
     # HACK: convert sys.argv to Unicode (not needed in Python 3)
     argv_encoding = CONFIG.get('system', 'argv-encoding')
