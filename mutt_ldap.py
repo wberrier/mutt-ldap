@@ -65,8 +65,6 @@ CONFIG.set('system', 'output-encoding', '')  # match .muttrc's $charset
 # HACK: Python 2.x support, see http://bugs.python.org/issue2128
 CONFIG.set('system', 'argv-encoding', '')
 
-CONFIG.read(_os_path.expanduser('~/.mutt-ldap.rc'))
-
 
 class LDAPConnection (object):
     """Wrap an LDAP connection supporting the 'with' statement
@@ -270,6 +268,8 @@ if __name__ == '__main__':
     import locale as _locale
     import sys as _sys
 
+    read_configfiles = CONFIG.read(_os_path.expanduser('~/.mutt-ldap.rc'))
+
     default_encoding = _locale.getpreferredencoding(do_setlocale=True)
     for key in ['output-encoding', 'argv-encoding']:
         CONFIG.set(
@@ -283,6 +283,8 @@ if __name__ == '__main__':
     # HACK: convert sys.argv to Unicode (not needed in Python 3)
     argv_encoding = CONFIG.get('system', 'argv-encoding')
     _sys.argv = [unicode(arg, argv_encoding) for arg in _sys.argv]
+
+    LOG.info(u'loaded configuration from {0}'.format(read_configfiles))
 
     if len(_sys.argv) < 2:
         _sys.stderr.write(
