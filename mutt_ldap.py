@@ -60,8 +60,10 @@ CONFIG.set('cache', 'path', '~/.mutt-ldap.cache') # cache results here
 CONFIG.set('cache', 'fields', '')  # fields to cache (if empty, setup in the main block)
 CONFIG.set('cache', 'longevity-days', '14') # TODO: cache results for 14 days by default
 CONFIG.add_section('system')
+# HACK: Python 2.x support, see http://bugs.python.org/issue13329#msg147475
+CONFIG.set('system', 'output-encoding', '')  # match .muttrc's $charset
 # HACK: Python 2.x support, see http://bugs.python.org/issue2128
-CONFIG.set('system', 'argv-encoding', 'utf-8')
+CONFIG.set('system', 'argv-encoding', '')
 
 CONFIG.read(_os_path.expanduser('~/.mutt-ldap.rc'))
 
@@ -264,7 +266,19 @@ def format_entry(entry):
 
 
 if __name__ == '__main__':
+    import codecs as _codecs
+    import locale as _locale
     import sys
+
+    default_encoding = _locale.getpreferredencoding(do_setlocale=True)
+    for key in ['output-encoding', 'argv-encoding']:
+        CONFIG.set(
+            'system', key,
+            CONFIG.get('system', key, raw=True) or default_encoding)
+
+    # HACK: convert sys.stdout to Unicode (not needed in Python 3)
+    output_encoding = CONFIG.get('system', 'output-encoding')
+    sys.stdout = _codecs.getwriter(output_encoding)(sys.stdout)
 
     # HACK: convert sys.argv to Unicode (not needed in Python 3)
     argv_encoding = CONFIG.get('system', 'argv-encoding')
