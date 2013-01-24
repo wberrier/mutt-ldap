@@ -54,7 +54,7 @@ Add the following line to your ``~/.muttrc``::
 
 Search for addresses (from Mutt_) with ``^t``, optionally after typing
 part of the name.  Configure your connection by creating
-``~/.mutt-ldap.rc`` contaning something like::
+``~/.mutt-ldap.rc`` containing something like::
 
   [connection]
   server = myserver.example.net
