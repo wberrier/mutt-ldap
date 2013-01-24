@@ -19,12 +19,15 @@
 
 "LDAP address searches for Mutt"
 
+import codecs as _codecs
 import ConfigParser as _configparser
 import hashlib as _hashlib
 import json as _json
+import locale as _locale
 import logging as _logging
 import os.path as _os_path
 import pickle as _pickle
+import sys as _sys
 import time as _time
 
 import ldap as _ldap
@@ -38,7 +41,51 @@ LOG = _logging.getLogger('mutt-ldap')
 LOG.addHandler(_logging.StreamHandler())
 LOG.setLevel(_logging.ERROR)
 
-CONFIG = _configparser.SafeConfigParser()
+
+class Config (_configparser.SafeConfigParser):
+    def load(self):
+        read_configfiles = self.read(_os_path.expanduser('~/.mutt-ldap.rc'))
+        self._setup_defaults()
+        LOG.info(u'loaded configuration from {0}'.format(read_configfiles))
+
+    def get_connection_class(self):
+        if self.getboolean('cache', 'enable'):
+            return CachedLDAPConnection
+        else:
+            return LDAPConnection
+
+    def _setup_defaults(self):
+        "Setup dynamic default values"
+        self._setup_encoding_defaults()
+        self._setup_cache_defaults()
+
+    def _setup_encoding_defaults(self):
+        default_encoding = _locale.getpreferredencoding(do_setlocale=True)
+        for key in ['output-encoding', 'argv-encoding']:
+            self.set(
+                'system', key,
+                self.get('system', key, raw=True) or default_encoding)
+
+        # HACK: convert sys.std{out,err} to Unicode (not needed in Python 3)
+        output_encoding = self.get('system', 'output-encoding')
+        _sys.stdout = _codecs.getwriter(output_encoding)(_sys.stdout)
+        _sys.stderr = _codecs.getwriter(output_encoding)(_sys.stderr)
+
+        # HACK: convert sys.argv to Unicode (not needed in Python 3)
+        argv_encoding = self.get('system', 'argv-encoding')
+        _sys.argv = [unicode(arg, argv_encoding) for arg in _sys.argv]
+
+    def _setup_cache_defaults(self):
+        if not self.get('cache', 'fields'):
+            # setup a reasonable default
+            fields = ['mail', 'cn', 'displayName']  # used by format_entry()
+            optional_column = self.get('results', 'optional-column')
+            if optional_column:
+                fields.append(optional_column)
+            self.set('cache', 'fields', ' '.join(fields))
+
+
+CONFIG = Config()
 CONFIG.add_section('connection')
 CONFIG.set('connection', 'server', 'domaincontroller.yourdomain.com')
 CONFIG.set('connection', 'port', '389')  # set to 636 for default over SSL
@@ -264,28 +311,7 @@ def format_entry(entry):
 
 
 if __name__ == '__main__':
-    import codecs as _codecs
-    import locale as _locale
-    import sys as _sys
-
-    read_configfiles = CONFIG.read(_os_path.expanduser('~/.mutt-ldap.rc'))
-
-    default_encoding = _locale.getpreferredencoding(do_setlocale=True)
-    for key in ['output-encoding', 'argv-encoding']:
-        CONFIG.set(
-            'system', key,
-            CONFIG.get('system', key, raw=True) or default_encoding)
-
-    # HACK: convert sys.std{out,err} to Unicode (not needed in Python 3)
-    output_encoding = CONFIG.get('system', 'output-encoding')
-    _sys.stdout = _codecs.getwriter(output_encoding)(_sys.stdout)
-    _sys.stderr = _codecs.getwriter(output_encoding)(_sys.stderr)
-
-    # HACK: convert sys.argv to Unicode (not needed in Python 3)
-    argv_encoding = CONFIG.get('system', 'argv-encoding')
-    _sys.argv = [unicode(arg, argv_encoding) for arg in _sys.argv]
-
-    LOG.info(u'loaded configuration from {0}'.format(read_configfiles))
+    CONFIG.load()
 
     if len(_sys.argv) < 2:
         LOG.error(u'{0}: no search string given'.format(_sys.argv[0]))
@@ -293,18 +319,7 @@ if __name__ == '__main__':
 
     query = u' '.join(_sys.argv[1:])
 
-    if CONFIG.getboolean('cache', 'enable'):
-        connection_class = CachedLDAPConnection
-        if not CONFIG.get('cache', 'fields'):
-            # setup a reasonable default
-            fields = ['mail', 'cn', 'displayName']  # used by format_entry()
-            optional_column = CONFIG.get('results', 'optional-column')
-            if optional_column:
-                fields.append(optional_column)
-            CONFIG.set('cache', 'fields', ' '.join(fields))
-    else:
-        connection_class = LDAPConnection
-
+    connection_class = CONFIG.get_connection_class()
     addresses = []
     with connection_class() as connection:
         entries = connection.search(query=query)
