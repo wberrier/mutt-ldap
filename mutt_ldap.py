@@ -268,7 +268,7 @@ def format_entry(entry):
 if __name__ == '__main__':
     import codecs as _codecs
     import locale as _locale
-    import sys
+    import sys as _sys
 
     default_encoding = _locale.getpreferredencoding(do_setlocale=True)
     for key in ['output-encoding', 'argv-encoding']:
@@ -278,17 +278,18 @@ if __name__ == '__main__':
 
     # HACK: convert sys.stdout to Unicode (not needed in Python 3)
     output_encoding = CONFIG.get('system', 'output-encoding')
-    sys.stdout = _codecs.getwriter(output_encoding)(sys.stdout)
+    _sys.stdout = _codecs.getwriter(output_encoding)(_sys.stdout)
 
     # HACK: convert sys.argv to Unicode (not needed in Python 3)
     argv_encoding = CONFIG.get('system', 'argv-encoding')
-    sys.argv = [unicode(arg, argv_encoding) for arg in sys.argv]
+    _sys.argv = [unicode(arg, argv_encoding) for arg in _sys.argv]
 
-    if len(sys.argv) < 2:
-        sys.stderr.write(u'{0}: no search string given\n'.format(sys.argv[0]))
-        sys.exit(1)
+    if len(_sys.argv) < 2:
+        _sys.stderr.write(
+            u'{0}: no search string given\n'.format(_sys.argv[0]))
+        _sys.exit(1)
 
-    query = u' '.join(sys.argv[1:])
+    query = u' '.join(_sys.argv[1:])
 
     if CONFIG.getboolean('cache', 'enable'):
         connection_class = CachedLDAPConnection
