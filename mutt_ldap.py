@@ -118,8 +118,9 @@ class Config (_configparser.SafeConfigParser):
     def _log_xdg_import_error(self):
         global _xdg_import_error
         if _xdg_import_error:
-            LOG.error(u'could not import xdg.BaseDirectory')
-            LOG.error(_xdg_import_error)
+            LOG.warning(u'could not import xdg.BaseDirectory '
+                u'or lacking necessary support')
+            LOG.warning(_xdg_import_error)
             _xdg_import_error = None
 
 
