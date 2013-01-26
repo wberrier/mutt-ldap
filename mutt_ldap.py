@@ -26,6 +26,7 @@ import json as _json
 import locale as _locale
 import logging as _logging
 import os.path as _os_path
+import os as _os
 import pickle as _pickle
 import sys as _sys
 import time as _time
@@ -108,11 +109,16 @@ class Config (_configparser.SafeConfigParser):
 
     def _get_cache_path(self):
         "Get the cache file path"
-        if _xdg_basedirectory:
+
+        # Some versions of pyxdg don't have save_cache_path (0.20 and older)
+        # See: https://bugs.freedesktop.org/show_bug.cgi?id=26458
+        if _xdg_basedirectory and 'save_cache_path' in dir(_xdg_basedirectory):
             path = _xdg_basedirectory.save_cache_path('')
         else:
             self._log_xdg_import_error()
             path = _os_path.expanduser(_os_path.join('~', '.cache'))
+            if not _os_path.isdir(path):
+                _os.makedirs(path)
         return _os_path.join(path, 'mutt-ldap.json')
 
     def _log_xdg_import_error(self):
