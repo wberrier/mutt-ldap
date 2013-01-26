@@ -143,7 +143,7 @@ CONFIG.add_section('cache')
 CONFIG.set('cache', 'enable', 'yes') # enable caching by default
 CONFIG.set('cache', 'path', '') # cache results here, defaults to XDG
 CONFIG.set('cache', 'fields', '')  # fields to cache (if empty, setup in the main block)
-CONFIG.set('cache', 'longevity-days', '14') # TODO: cache results for 14 days by default
+CONFIG.set('cache', 'longevity-days', '14') # Days before cache entries are invalidated
 CONFIG.add_section('system')
 # HACK: Python 2.x support, see http://bugs.python.org/issue13329#msg147475
 CONFIG.set('system', 'output-encoding', '')  # match .muttrc's $charset
