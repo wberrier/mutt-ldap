@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 #
 # Copyright (C) 2008-2013  W. Trevor King
-# Copyright (C) 2012-2013  Wade Berrier
+# Copyright (C) 2012-2017  Wade Berrier
 # Copyright (C) 2012       Niels de Vos
 #
 # This program is free software: you can redistribute it and/or modify
@@ -57,11 +57,33 @@ class Config (_configparser.SafeConfigParser):
         self._setup_defaults()
         LOG.info(u'loaded configuration from {0}'.format(read_config_paths))
 
+        # Check for an authorization file and load if found
+        auth_file = self.get('auth', 'file')
+        if auth_file != "":
+            self.auth_config = _configparser.SafeConfigParser()
+            LOG.info(u'loading authorization file: {0}'.format(auth_file))
+            self.auth_config.read(auth_file)
+        else:
+            self.auth_config = None
+
     def get_connection_class(self):
         if self.getboolean('cache', 'enable'):
             return CachedLDAPConnection
         else:
             return LDAPConnection
+
+    def get_username(self):
+
+        if self.auth_config:
+            return self.auth_config.get('auth', 'user')
+        else:
+            return self.get('auth', 'user')
+
+    def get_password(self):
+        if self.auth_config:
+            return self.auth_config.get('auth', 'password')
+        else:
+            return self.get('auth', 'password')
 
     def _setup_defaults(self):
         "Setup dynamic default values"
@@ -140,6 +162,7 @@ CONFIG.set('connection', 'basedn', 'ou=x co.,dc=example,dc=net')
 CONFIG.add_section('auth')
 CONFIG.set('auth', 'user', '')
 CONFIG.set('auth', 'password', '')
+CONFIG.set('auth', 'file', '')
 CONFIG.set('auth', 'gssapi', 'no')
 CONFIG.add_section('query')
 CONFIG.set('query', 'filter', '') # only match entries according to this filter
@@ -196,8 +219,8 @@ class LDAPConnection (object):
             self.connection.sasl_interactive_bind_s('', sasl)
         else:
             self.connection.bind(
-                self.config.get('auth', 'user'),
-                self.config.get('auth', 'password'),
+                self.config.get_username(),
+                self.config.get_password(),
                 _ldap.AUTH_SIMPLE)
 
     def unbind(self):
