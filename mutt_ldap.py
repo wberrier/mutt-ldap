@@ -1,7 +1,7 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 #
 # Copyright (C) 2008-2013  W. Trevor King
-# Copyright (C) 2012-2017  Wade Berrier
+# Copyright (C) 2012-2020  Wade Berrier
 # Copyright (C) 2012       Niels de Vos
 #
 # This program is free software: you can redistribute it and/or modify
@@ -19,8 +19,7 @@
 
 "LDAP address searches for Mutt"
 
-import codecs as _codecs
-import ConfigParser as _configparser
+import configparser as _configparser
 import hashlib as _hashlib
 import json as _json
 import locale as _locale
@@ -49,7 +48,7 @@ LOG.addHandler(_logging.StreamHandler())
 LOG.setLevel(_logging.ERROR)
 
 
-class Config (_configparser.SafeConfigParser):
+class Config (_configparser.ConfigParser):
     def load(self):
         config_paths = self._get_config_paths()
         LOG.info(u'load configuration from {0}'.format(config_paths))
@@ -60,7 +59,7 @@ class Config (_configparser.SafeConfigParser):
         # Check for an authorization file and load if found
         auth_file = self.get('auth', 'file')
         if auth_file != "":
-            self.auth_config = _configparser.SafeConfigParser()
+            self.auth_config = _configparser.ConfigParser()
             LOG.info(u'loading authorization file: {0}'.format(auth_file))
             self.auth_config.read(auth_file)
         else:
@@ -96,15 +95,6 @@ class Config (_configparser.SafeConfigParser):
             self.set(
                 'system', key,
                 self.get('system', key, raw=True) or default_encoding)
-
-        # HACK: convert sys.std{out,err} to Unicode (not needed in Python 3)
-        output_encoding = self.get('system', 'output-encoding')
-        _sys.stdout = _codecs.getwriter(output_encoding)(_sys.stdout)
-        _sys.stderr = _codecs.getwriter(output_encoding)(_sys.stderr)
-
-        # HACK: convert sys.argv to Unicode (not needed in Python 3)
-        argv_encoding = self.get('system', 'argv-encoding')
-        _sys.argv = [unicode(arg, argv_encoding) for arg in _sys.argv]
 
     def _setup_cache_defaults(self):
         if not self.get('cache', 'path'):
@@ -230,6 +220,18 @@ class LDAPConnection (object):
         self.connection.unbind()
         self.connection = None
 
+    def _stringify_entry(self, entry):
+        """Decode all binary values"""
+        # There's certainly a more elegant way to do this, but this works
+        cn, data = entry
+        str_data = {}
+        for k, v in data.items():
+            str_v = []
+            for item in v:
+                str_v.append(item.decode('utf-8'))
+            str_data[k] = str_v
+        return (cn, str_data)
+
     def search(self, query):
         if self.connection is None:
             raise RuntimeError('connect to the LDAP server before searching')
@@ -247,19 +249,19 @@ class LDAPConnection (object):
         msg_id = self.connection.search(
             self.config.get('connection', 'basedn'),
             _ldap.SCOPE_SUBTREE,
-            filterstr.encode('utf-8'))
+            filterstr)
         res_type = None
         while res_type != _ldap.RES_SEARCH_RESULT:
             try:
                 res_type, res_data = self.connection.result(
                     msg_id, all=False, timeout=0)
             except _ldap.ADMINLIMIT_EXCEEDED as e:
-                LOG.warn(u'could not handle query results: {0}'.format(e))
+                LOG.warning(u'could not handle query results: {0}'.format(e))
                 break
             if res_data:
                 # use `yield from res_data` in Python >= 3.3, see PEP 380
                 for entry in res_data:
-                    yield entry
+                    yield self._stringify_entry(entry)
 
 
 class CachedLDAPConnection (LDAPConnection):
@@ -301,11 +303,11 @@ class CachedLDAPConnection (LDAPConnection):
         LOG.info(u'load cache from {0}'.format(path))
         self._cache = {}
         try:
-            data = _json.load(open(path, 'rb'))
+            data = _json.load(open(path, 'r'))
         except IOError as e:  # probably "No such file"
-            LOG.warn(u'error reading cache: {0}'.format(e))
+            LOG.warning(u'error reading cache: {0}'.format(e))
         except (ValueError, KeyError) as e:  # probably a corrupt cache file
-            LOG.warn(u'error parsing cache: {0}'.format(e))
+            LOG.warning(u'error parsing cache: {0}'.format(e))
         else:
             version = data.get('version', None)
             if version == self._cache_version:
@@ -322,9 +324,9 @@ class CachedLDAPConnection (LDAPConnection):
             'queries': self._cache,
             'version': self._cache_version,
             }
-        with open(path, 'wb') as f:
+        with open(path, 'w') as f:
             _json.dump(data, f, indent=2, separators=(',', ': '))
-            f.write('\n'.encode('utf-8'))
+            f.write('\n')
 
     def _cache_store(self, query, entries):
         self._cache[self._cache_key(query=query)] = {
@@ -357,17 +359,13 @@ class CachedLDAPConnection (LDAPConnection):
                 self._cache.pop(key)
 
 
-def _decode_query_data(obj):
-    if isinstance(obj, unicode):  # e.g. cached JSON data
-        return obj
-    return unicode(obj, 'utf-8')
-
 def format_columns(address, data):
-    yield _decode_query_data(address)
-    yield _decode_query_data(data.get('displayName', data['cn'])[-1])
+    yield address
+    yield data.get('displayName', data['cn'])[-1]
     optional_column = CONFIG.get('results', 'optional-column')
     if optional_column in data:
-        yield _decode_query_data(data[optional_column][-1])
+        yield data[optional_column][-1]
+
 
 def format_entry(entry):
     cn,data = entry
