@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#
+# 
 # Copyright (C) 2008-2013  W. Trevor King
 # Copyright (C) 2012-2020  Wade Berrier
 # Copyright (C) 2012       Niels de Vos
@@ -26,6 +26,7 @@ import locale as _locale
 import logging as _logging
 import os.path as _os_path
 import os as _os
+import subprocess
 import pickle as _pickle
 import sys as _sys
 import time as _time
@@ -78,11 +79,37 @@ class Config (_configparser.ConfigParser):
         else:
             return self.get('auth', 'user')
 
+    # def get_password(self):
+    #     if self.auth_config:
+    #         return self.auth_config.get('auth', 'password')
+    #     else:
+    #         return self.get('auth', 'password')
+
     def get_password(self):
+        password_cmd_key = 'password-cmd'
+        password_key = 'password'
+
+        # First, try to get the password command
+        password_cmd = None
         if self.auth_config:
-            return self.auth_config.get('auth', 'password')
+            password_cmd = self.auth_config.get('auth', password_cmd_key, fallback=None)
         else:
-            return self.get('auth', 'password')
+            password_cmd = self.get('auth', password_cmd_key, fallback=None)
+
+        # If a password command is provided, try to execute it to get the password
+        if password_cmd:
+            try:
+                result = subprocess.run(password_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, shell=True)
+                return result.stdout.strip()
+            except subprocess.CalledProcessError as e:
+                print(f"An error occurred while executing the password command: {e}")
+
+        # If password command is not provided or fails, fall back to password
+        if self.auth_config:
+            return self.auth_config.get('auth', password_key)
+        else:
+            return self.get('auth', password_key)
+
 
     def _setup_defaults(self):
         "Setup dynamic default values"
