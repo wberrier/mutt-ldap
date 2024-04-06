@@ -13,35 +13,36 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from distutils.core import setup as _setup
-import os.path as _os_path
+from setuptools import setup
+import os
 
-import mutt_ldap as _mutt_ldap
+with open(os.path.join(os.path.dirname(__file__), "README.rst"), encoding="utf-8") as f:
+    readme = f.read()
 
-
-_this_dir = _os_path.dirname(__file__)
-
-_setup(
-    name='mutt-ldap',
-    version=_mutt_ldap.__version__,
-    maintainer='W. Trevor King',
-    maintainer_email='wking@tremily.us',
+setup(
+    name="mutt-ldap",
+    maintainer="W. Trevor King",
+    maintainer_email="wking@tremily.us",
     url='http://blog.tremily.us/posts/mutt-ldap/',
-    download_url='http://git.tremily.us/?p=mutt-ldap.git;a=snapshot;h=v{};sf=tgz'.format(_mutt_ldap.__version__),
-    license = 'GNU General Public License (GPL)',
-    platforms = ['all'],
-    description = _mutt_ldap.__doc__.splitlines()[0],
-    long_description=open(_os_path.join(_this_dir, 'README'), 'r').read(),
-    classifiers = [
-        'Development Status :: 3 - Alpha',
-        'Intended Audience :: End Users/Desktop',
-        'Operating System :: OS Independent',
-        'License :: OSI Approved :: GNU General Public License (GPL)',
-        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
-        'Programming Language :: Python :: 2.6',
-        'Programming Language :: Python :: 2.7',
-        'Topic :: Communications :: Email',
-        ],
-    py_modules = ['mutt_ldap'],
-    scripts = ['mutt_ldap.py'],
-    )
+    download_url = f"https://github.com/wberrier/mutt-ldap/archive/refs/tags/v{_mutt_ldap.__version__}.tar.gz"
+    license="GNU General Public License (GPL)",
+    description="A tool to query an LDAP server for email addresses and names, suitable for use with Mutt.",
+    long_description=readme,
+    long_description_content_type="text/rst",
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: End Users/Desktop",
+        "Operating System :: OS Independent",
+        "License :: OSI Approved :: GNU General Public License (GPL)",
+        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+        "Programming Language :: Python :: 3",
+        "Topic :: Communications :: Email",
+    ],
+    platforms=['all'],
+    packages=[],
+    scripts=["mutt_ldap.py"],
+    py_modules=["mutt_ldap"],
+    install_requires=[
+        "python-ldap>=3.0",
+    ],
+)
