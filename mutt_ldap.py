@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # Copyright (C) 2008-2013  W. Trevor King
-# Copyright (C) 2012-2020  Wade Berrier
+# Copyright (C) 2012-2024  Wade Berrier
 # Copyright (C) 2012       Niels de Vos
 #
 # This program is free software: you can redistribute it and/or modify
@@ -26,6 +26,7 @@ import locale as _locale
 import logging as _logging
 import os.path as _os_path
 import os as _os
+import subprocess
 import pickle as _pickle
 import sys as _sys
 import time as _time
@@ -79,10 +80,29 @@ class Config (_configparser.ConfigParser):
             return self.get('auth', 'user')
 
     def get_password(self):
+        password_cmd_key = 'password-cmd'
+        password_key = 'password'
+
+        # First, try to get the password command
+        password_cmd = None
         if self.auth_config:
-            return self.auth_config.get('auth', 'password')
+            password_cmd = self.auth_config.get('auth', password_cmd_key, fallback=None)
         else:
-            return self.get('auth', 'password')
+            password_cmd = self.get('auth', password_cmd_key, fallback=None)
+
+        # If a password command is provided, try to execute it to get the password
+        if password_cmd:
+            try:
+                result = subprocess.run(password_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, shell=True)
+                return result.stdout.strip()
+            except subprocess.CalledProcessError as e:
+                print(f"An error occurred while executing the password command: {e}")
+
+        # If password command is not provided or fails, fall back to password
+        if self.auth_config:
+            return self.auth_config.get('auth', password_key)
+        else:
+            return self.get('auth', password_key)
 
     def _setup_defaults(self):
         "Setup dynamic default values"
@@ -376,7 +396,33 @@ def format_entry(entry):
             yield u'\t'.join(format_columns(m, data))
 
 
-if __name__ == '__main__':
+import argparse
+import textwrap
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog='mutt_ldap',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent('''\
+            LDAP address searches for Mutt
+            --------------------------------
+            This script provides an interface to perform LDAP searches
+            for email addresses and contact information, formatted
+            specifically for use with the Mutt email client.
+        '''),
+        epilog=textwrap.dedent('''\
+            License: GPL-3.0-or-later
+            Repository: https://github.com/wberrier/mutt-ldap
+            Authors: W. Trevor King, Wade Berrier, Niels de Vos
+        ''')
+    )
+    parser.add_argument('--version', action='version', version=__version__)
+    parser.add_argument('query', nargs='+', help='Search query for the LDAP directory')
+    parser.add_argument('--config', help='Path to the configuration file', default=None)
+    parser.add_argument('--verbose', action='store_true', help='Increase output verbosity')
+    args = parser.parse_args()
+
+    # Configuration loading and LDAP search logic:
     CONFIG.load()
 
     if len(_sys.argv) < 2:
@@ -393,3 +439,10 @@ if __name__ == '__main__':
             addresses.extend(format_entry(entry))
     print(u'{0} addresses found:'.format(len(addresses)))
     print(u'\n'.join(addresses))
+
+    if args.verbose:
+        print(f"Search query: {' '.join(args.query)}")
+        # Additional verbose output
+
+if __name__ == '__main__':
+    main()
