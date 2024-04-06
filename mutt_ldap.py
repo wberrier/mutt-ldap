@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 
+#
 # Copyright (C) 2008-2013  W. Trevor King
 # Copyright (C) 2012-2020  Wade Berrier
 # Copyright (C) 2012       Niels de Vos
@@ -78,12 +78,6 @@ class Config (_configparser.ConfigParser):
             return self.auth_config.get('auth', 'user')
         else:
             return self.get('auth', 'user')
-
-    # def get_password(self):
-    #     if self.auth_config:
-    #         return self.auth_config.get('auth', 'password')
-    #     else:
-    #         return self.get('auth', 'password')
 
     def get_password(self):
         password_cmd_key = 'password-cmd'
