@@ -27,8 +27,8 @@ import locale as _locale
 import logging as _logging
 import os as _os
 import os.path as _os_path
-import pickle as _pickle
 import subprocess
+import pickle as _pickle
 import sys as _sys
 import textwrap
 import time as _time
