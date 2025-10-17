@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"LDAP address searches for Mutt"
+"LDAP address searches for Mutt (ldap3 backend)"
 
 import argparse
 import configparser as _configparser
@@ -34,9 +34,10 @@ import sys as _sys
 import textwrap
 import time as _time
 
-import ldap as _ldap
-import ldap.sasl as _ldap_sasl
-import ldap.filter as _ldap_filter
+# ldap3 replaces python-ldap
+from ldap3 import Server as _L3Server, Connection as _L3Connection, SUBTREE as _L3_SUBTREE, SASL as _L3_SASL, GSSAPI as _L3_GSSAPI, ALL as _L3_ALL
+from ldap3.core.exceptions import LDAPException as _L3_LDAPException
+from ldap3.utils.conv import escape_filter_chars as _l3_escape_filter_chars
 
 _xdg_import_error = None
 try:
@@ -148,8 +149,7 @@ class Config (_configparser.ConfigParser):
     def _log_xdg_import_error(self):
         global _xdg_import_error
         if _xdg_import_error:
-            LOG.warning('could not import xdg.BaseDirectory '
-                'or lacking necessary support')
+            LOG.warning('could not import xdg.BaseDirectory or lacking necessary support')
             LOG.warning(_xdg_import_error)
             _xdg_import_error = None
 
@@ -177,19 +177,16 @@ CONFIG.set('cache', 'path', '')  # cache results here, defaults to XDG
 CONFIG.set('cache', 'fields', '')  # fields to cache (if empty, setup in the main block)
 CONFIG.set('cache', 'longevity-days', '14')  # Days before cache entries are invalidated
 CONFIG.add_section('system')
-# HACK: Python 2.x support, see http://bugs.python.org/issue13329#msg147475
 CONFIG.set('system', 'output-encoding', '')  # match .muttrc's $charset
-# HACK: Python 2.x support, see http://bugs.python.org/issue2128
 CONFIG.set('system', 'argv-encoding', '')
 
 
 class LDAPConnection:
-    """Wrap an LDAP connection supporting the 'with' statement
+    """Wrap an LDAP connection supporting the 'with' statement (ldap3)"""
 
-    See PEP 343 for details.
-    """
     def __init__(self, config=None):
         self.config = config or CONFIG
+        self.server = None
         self.connection = None
 
     # Establish LDAP connection
@@ -205,74 +202,107 @@ class LDAPConnection:
     def connect(self):
         if self.connection is not None:
             raise RuntimeError('Already connected to the LDAP server')
-        protocol = 'ldaps' if self.config.getboolean('connection', 'ssl', fallback=False) else 'ldap'
-        url = f"{protocol}://{self.config.get('connection', 'server')}:{self.config.get('connection', 'port')}"
+        server_host = self.config.get('connection', 'server')
+        server_port = self.config.getint('connection', 'port', fallback=389)
+        use_ssl = self.config.getboolean('connection', 'ssl', fallback=False)
+        protocol = 'ldaps' if use_ssl else 'ldap'
+        url = f"{protocol}://{server_host}:{server_port}"
         LOG.info(f'connect to LDAP server at {url}')
-        self.connection = _ldap.initialize(url)
-        if self.config.getboolean('connection', 'starttls', fallback=False) and protocol == 'ldap':
-            self.connection.start_tls_s()
-        if self.config.getboolean('auth', 'gssapi', fallback=False):
-            sasl = _ldap_sasl.gssapi()
-            self.connection.sasl_interactive_bind_s('', sasl)
+
+        # Build ldap3 Server and Connection objects
+        self.server = _L3Server(server_host, port=server_port, use_ssl=use_ssl, get_info=_L3_ALL)
+
+        gssapi = self.config.getboolean('auth', 'gssapi', fallback=False)
+        if gssapi:
+            self.connection = _L3Connection(self.server, authentication=_L3_SASL, sasl_mechanism=_L3_GSSAPI, raise_exceptions=True, auto_bind=False)
         else:
-            # Use simple bind for user/password authentication
-            self.connection.simple_bind_s(self.config.get_username(), self.config.get_password())
+            self.connection = _L3Connection(self.server, user=self.config.get_username(), password=self.config.get_password(), raise_exceptions=True, auto_bind=False)
+
+        # Open socket, optionally StartTLS, then bind
+        self.connection.open()
+        if self.config.getboolean('connection', 'starttls', fallback=False) and not use_ssl:
+            self.connection.start_tls()
+        self.connection.bind()
 
     def unbind(self):
         if self.connection is None:
             return
         LOG.info('unbind from LDAP server')
         try:
-            self.connection.unbind_s()
+            self.connection.unbind()
         finally:
             self.connection = None
+            self.server = None
 
     def search(self, query):
         if self.connection is None:
             raise RuntimeError('Connect to the LDAP server before searching')
+
+        # Compose filter
         post = '*' if query else ''
         fields = self.config.get('query', 'search-fields', fallback='').split()
-        escaped = _ldap_filter.escape_filter_chars(query) if query else ''
+        escaped = _l3_escape_filter_chars(query) if query else ''
         filterstr = '(|{})'.format(''.join([f'({field}=*{escaped}{post})' for field in fields]))
         query_filter = self.config.get('query', 'filter', fallback='')
         if query_filter:
             filterstr = f'(&({query_filter}){filterstr})'
         LOG.info(f'Searching for {filterstr}')
+
         # Limit attributes to those needed for output and caching
         cache_fields = self.config.get('cache', 'fields', fallback='').split()
         optional_column = self.config.get('results', 'optional-column', fallback="")
         needed = set(cache_fields) | {'mail', 'cn', 'displayName'}
         if optional_column:
             needed.add(optional_column)
-        attrs = sorted(needed)
+        attrs = sorted(a for a in needed if a)
+
         try:
-            results = self.connection.search_s(
-                self.config.get('connection', 'basedn'),
-                _ldap.SCOPE_SUBTREE,
-                filterstr,
-                attrs
+            self.connection.search(
+                search_base=self.config.get('connection', 'basedn'),
+                search_filter=filterstr,
+                search_scope=_L3_SUBTREE,
+                attributes=attrs
             )
-        except _ldap.ADMINLIMIT_EXCEEDED as e:
-            LOG.warning(f'Could not handle query results: {e}')
-            results = []
+        except _L3_LDAPException as e:
+            # Admin limit handling in ldap3 raises a specific subclass in many versions;
+            # fall back to class name inspection to avoid hard-coding imports across versions.
+            if e.__class__.__name__ == 'LDAPAdminLimitExceededResult':
+                LOG.warning(f'Could not handle query results: {e}')
+                results = []
+            else:
+                raise
+        else:
+            results = self.connection.response or []
+
+        # Yield entries in (dn, {attr: [str, ...]}) form
         for entry in results:
-            yield self._stringify_entry(entry)
+            if entry.get('type') != 'searchResEntry':
+                continue
+            dn = entry.get('dn', '')
+            data = entry.get('attributes', {}) or {}
+            yield self._stringify_entry((dn, data))
 
     # Convert LDAP entry to string
     def _stringify_entry(self, entry):
         dn, data = entry
-        return (dn.decode('utf-8', errors='replace') if isinstance(dn, bytes) else dn,
-                {k: [(item.decode('utf-8', errors='replace') if isinstance(item, (bytes, bytearray)) else str(item))
-                     for item in v]
-                 for k, v in data.items()})
+        # Ensure string types and lists of strings
+        return (
+            str(dn),
+            {
+                k: [
+                    (item.decode('utf-8', errors='replace') if isinstance(item, (bytes, bytearray)) else str(item))
+                    for item in (v if isinstance(v, (list, tuple)) else [v])
+                ]
+                for k, v in data.items()
+            }
+        )
 
 
 class CachedLDAPConnection (LDAPConnection):
     _cache_version = f'{__version__}.0'
 
-    # Connect to LDAP server with caching
+    # Connect to LDAP server with caching (lazy connect)
     def connect(self):
-        # delay LDAP connection until we actually need it
         self._load_cache()
 
     # Unbind from LDAP server and save cache
@@ -287,21 +317,21 @@ class CachedLDAPConnection (LDAPConnection):
         cache_hit, entries = self._cache_lookup(query=query)
         if cache_hit:
             LOG.info(f'Returning cached entries for {query}')
-            # use `yield from res_data` in Python >= 3.3, see PEP 380
             for entry in entries:
                 yield entry
-        else:
-            if not self.connection:
-                super().connect()
-            entries = []
-            keys = self.config.get('cache', 'fields', fallback='').split()
-            for entry in super().search(query):
-                dn, data = entry
-                # use dict comprehensions in Python >= 2.7, see PEP 274
-                cached_data = {key: data[key] for key in keys if key in data} if keys else data
-                entries.append((dn, cached_data))
-                yield entry
-            self._cache_store(query=query, entries=entries)
+            return
+
+        if not self.connection:
+            super().connect()
+
+        entries = []
+        keys = self.config.get('cache', 'fields', fallback='').split()
+        for entry in super().search(query):
+            dn, data = entry
+            cached_data = {key: data[key] for key in keys if key in data} if keys else data
+            entries.append((dn, cached_data))
+            yield entry
+        self._cache_store(query=query, entries=entries)
 
     # Load cache from file
     def _load_cache(self):
@@ -347,8 +377,7 @@ class CachedLDAPConnection (LDAPConnection):
         return str((self._config_id(), query))
 
     def _config_id(self):
-        """Return a unique ID representing the current configuration
-        """
+        """Return a unique ID representing the current configuration"""
         return _hashlib.sha1(_pickle.dumps(self.config)).hexdigest()
 
     def _cull_cache(self):
@@ -379,12 +408,15 @@ def format_entry(entry):
 def _check_dependency_compatibility():
     """Check library versions and warn if they are likely incompatible with recent releases"""
     try:
-        ldap_version = getattr(_ldap, '__version__', '')
-        major = int(str(ldap_version).split('.')[0]) if ldap_version else 0
-        if major and major < 3:
-            LOG.warning(f'python-ldap {ldap_version} detected; python-ldap >= 3.x is recommended.')
+        import ldap3 as _ldap3
+        ldap3_version = getattr(_ldap3, '__version__', '')
+        # ldap3 2.6+ recommended; 2.9+ widely deployed
+        parts = str(ldap3_version).split('.')
+        major = int(parts[0]) if parts and parts[0].isdigit() else 0
+        if major and major < 2:
+            LOG.warning(f'ldap3 {ldap3_version} detected; ldap3 >= 2.x is recommended.')
     except Exception as e:
-        LOG.debug(f'Could not determine python-ldap version: {e}')
+        LOG.debug(f'Could not determine ldap3 version: {e}')
     if _xdg_basedirectory is None:
         LOG.warning('python-xdg not available; falling back to ~/.config and ~/.cache paths.')
 
@@ -438,7 +470,7 @@ def main():
             for entry in connection.search(query):
                 for line in format_entry(entry):
                     addresses.append(line)
-    except _ldap.LDAPError as e:
+    except _L3_LDAPException as e:
         print(f'LDAP error: {e}', file=_sys.stderr)
         _sys.exit(2)
 

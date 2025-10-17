@@ -34,7 +34,7 @@ classifiers = [
   "Topic :: Communications :: Email",
 ]
 dependencies = [
-  "python-ldap>=3.4.4",
+  "ldap3>=2.9"
 ]
 
 # -------------------------------
