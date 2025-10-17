@@ -40,10 +40,21 @@ from ldap3.core.exceptions import LDAPException as _L3_LDAPException
 from ldap3.utils.conv import escape_filter_chars as _l3_escape_filter_chars
 
 _xdg_import_error = None
+_has_xdg = True
 try:
     import xdg.BaseDirectory as _xdg_basedirectory
-except ImportError as _xdg_import_error:
+except ImportError as e:
+    _has_xdg = False
     _xdg_basedirectory = None
+    _xdg_import_error = e
+
+def _log_xdg_import_error():
+    # Log at most once.
+    global _xdg_import_error
+    if _xdg_import_error is not None:
+        LOG.warning('python-xdg not available; falling back to ~/.config and ~/.cache paths.')
+        LOG.warning(_xdg_import_error)
+        _xdg_import_error = None
 
 
 __version__ = '0.1'
