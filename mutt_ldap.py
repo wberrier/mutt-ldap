@@ -77,7 +77,6 @@ class Config (_configparser.ConfigParser):
         # If a password command is provided, try to execute it to get the password
         if password_cmd:
             try:
-                # shlex.split(password_cmd) preferred to password.split()
                 result = subprocess.run(password_cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
                 return result.stdout.strip()
             except subprocess.CalledProcessError as e:
@@ -358,10 +357,6 @@ def main():
 
     # Configuration loading and LDAP search logic:
     CONFIG.load(args.config)
-
-    if len(_sys.argv) < 2:
-        LOG.error(f'{_sys.argv[0]}: no search string given')
-        _sys.exit(1)
 
     query = ' '.join(args.query)
 
