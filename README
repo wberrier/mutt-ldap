@@ -36,7 +36,7 @@ part of the name.  Configure your connection by creating
   password-cmd = pass example
 
 The query cache (enabled by default) will be created at
-``$XDG_DATA_HOME/mutt-ldap.json``, unless overriden by an explicit
+``$XDG_DATA_HOME/mutt-ldap.json``, unless overridden by an explicit
 ``cache.path`` setting.
 
 See the `XDG Base Directory Specification`_ for more
