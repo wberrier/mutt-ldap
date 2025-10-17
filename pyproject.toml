@@ -1,0 +1,60 @@
+# -------------------------------
+# Build system (PEP 517/518)
+# -------------------------------
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+# -------------------------------
+# Project metadata (PEP 621)
+# -------------------------------
+[project]
+name = "mutt-ldap"
+version = "0.1"
+description = "A tool to query an LDAP server for email addresses and names, suitable for use with Mutt."
+readme = "README.rst"
+requires-python = ">=3.7"
+license = "GPL-3.0-or-later"
+license-files = [ "COPYING" ]
+authors = [
+{ name = "W. Trevor King", email = "wking@tremily.us" },
+{ name = "Wade Berrier" },
+{ name = "Niels de Vos" },
+]
+maintainers = [
+{ name = "W. Trevor King", email = "wking@tremily.us" },
+{ name = "Konfekt" },
+]
+keywords = ["mutt", "ldap", "email", "addressbook"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: End Users/Desktop",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Topic :: Communications :: Email",
+]
+dependencies = [
+  "python-ldap>=3.4.4",
+]
+
+# -------------------------------
+# Useful links
+# -------------------------------
+[project.urls]
+Homepage = "http://blog.tremily.us/posts/mutt-ldap/"
+Repository = "https://github.com/konfekt/mutt-ldap"
+Issues = "https://github.com/konfekt/mutt-ldap/issues"
+Download = "https://github.com/konfekt/mutt-ldap/releases"
+
+# -------------------------------
+# Console script entry point
+# -------------------------------
+[project.scripts]
+mutt-ldap = "mutt_ldap:main"
+
+# -------------------------------
+# Setuptools configuration
+# -------------------------------
+[tool.setuptools]
+# Ship as a single-module distribution.
+py-modules = ["mutt_ldap"]
