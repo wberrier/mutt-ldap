@@ -93,8 +93,9 @@ Configure the connection by creating ``$XDG_CONFIG_HOME/mutt-ldap/mutt-ldap.cfg`
    user         = username
    password-cmd = pass example
 
-The query cache (enabled by default) is stored at
-``$XDG_CACHE_HOME/mutt-ldap/mutt-ldap.json`` unless overridden by ``cache.path``.
+The query cache (enabled by default) will be created at
+``$XDG_DATA_HOME/mutt-ldap.json``, unless overridden by an explicit
+``cache.path`` setting.
 
 See the XDG Base Directory Specification for details on configuration and cache locations.
 
