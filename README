@@ -1,51 +1,106 @@
-Mutt-LDAP provides an `external address query script`_ for Mutt_ which
-connects to LDAP_ databases using python-ldap_.  It can cache queries
-locally in case your LDAP server is slow or not always available,
-expiring cached queries after a configurable amount of time.
+Installation
+============
+
+Recommended (isolated, user-level)
+----------------------------------
+
+- Using uv:
+
+  .. code-block:: bash
+
+     uv tool install git+https://github.com/Konfekt/mutt-ldap
+
+  Upgrade and uninstall:
+
+  .. code-block:: bash
+
+     uv tool upgrade mutt-ldap
+     uv tool uninstall mutt-ldap
+
+- Using pipx:
+
+  .. code-block:: bash
+
+     pipx install git+https://github.com/Konfekt/mutt-ldap
+
+  Upgrade and uninstall:
+
+  .. code-block:: bash
+
+     pipx upgrade mutt-ldap
+     pipx uninstall mutt-ldap
+
+Alternative
+-----------
+
+- Using pip in a virtual environment:
+
+  .. code-block:: bash
+
+     python -m venv .venv
+     . .venv/bin/activate
+     pip install git+https://github.com/Konfekt/mutt-ldap
+
+- From a local checkout:
+
+  .. code-block:: bash
+
+     git clone https://github.com/Konfekt/mutt-ldap.git
+     cd mutt-ldap
+     pipx install .
+
+Dependencies
+============
+
+- ldap3 (Python LDAP client; no system LDAP libs required)
+- pyxdg (XDG base directory support)
+
+Both are declared as runtime dependencies and installed automatically by the methods above.
 
 Usage
 =====
 
-  usage: mutt_ldap [-h] [--version] [--config CONFIG] [--verbose]
-                  query [query ...]
+.. code-block:: text
+
+   usage: mutt-ldap [-h] [--version] [--config CONFIG] [--verbose]
+                    query [query ...]
 
 positional arguments:
   query            Search query for the LDAP directory
 
 optional arguments:
   --config CONFIG  Path to the configuration file
+  --verbose        Increase output verbosity
 
-If the ``xdg`` module supplied by PyXDG_ is not available, the default
-configuration path falls back on ``~/.config/mutt-ldap.cfg`` and the default
-cache path falls back on ``~/.cache/mutt-ldap.json``.
+If PyXDG is not available, the default configuration path falls back to ``~/.config/mutt-ldap/mutt-ldap.cfg`` and the default cache path falls back to ``~/.cache/mutt-ldap/mutt-ldap.json``.
 
-To use in mutt, add the following line to your ``~/.muttrc``::
+To use in Mutt, add to ``~/.muttrc``::
 
-  set query_command = "mutt_ldap.py '%s'"
+  set query_command = 'mutt-ldap "%s"'
 
-Search for addresses (from Mutt_) with ``^t``, optionally after typing
-part of the name.  Configure your connection by creating
-``$XDG_CONFIG_HOME/mutt-ldap.cfg`` containing something like::
+Search for addresses in Mutt with ``^t``, optionally after typing part of a name.
 
-  [connection]
-  server = myserver.example.net
-  port   = 1389
-  basedn = ou=people,dc=example,dc=net
-  [auth]
-  user         = username
-  password-cmd = pass example
+Configure the connection by creating ``$XDG_CONFIG_HOME/mutt-ldap/mutt-ldap.cfg`` with content such as:
+
+.. code:: ini
+
+   [connection]
+   server = myserver.example.net
+   port   = 1389
+   basedn = ou=people,dc=example,dc=net
+
+   [auth]
+   user         = username
+   password-cmd = pass example
 
 The query cache (enabled by default) will be created at
 ``$XDG_DATA_HOME/mutt-ldap.json``, unless overridden by an explicit
 ``cache.path`` setting.
 
-See the `XDG Base Directory Specification`_ for more
-details on configuration and cache file locations.  
+See the XDG Base Directory Specification for details on configuration and cache locations.
 
 Example Config File
 ===================
-
-Create a file named ``mutt-ldap.cfg`` with the following content:
 
 .. code:: ini
 
@@ -66,6 +121,9 @@ Create a file named ``mutt-ldap.cfg`` with the following content:
    filter =
    search-fields = cn displayName uid mail
 
+   [results]
+   optional-column =
+
    [cache]
    enable = yes
    path =
@@ -77,118 +135,82 @@ Create a file named ``mutt-ldap.cfg`` with the following content:
    argv-encoding =
 
 Config Settings
-=================================
+===============
 
 Connection Section
 ------------------
 
--  ``server``: The domain name or IP address of the LDAP server.
--  ``port``: The port number to connect to on the LDAP server. Use ``389`` for LDAP or ``636`` for LDAPS (LDAP over SSL).
--  ``ssl``: Set to ``yes`` to enable SSL encryption. If using SSL, ensure the port is set to ``636``.
--  ``starttls``: Set to ``yes`` to enable STARTTLS, which upgrades a plain text connection to an encrypted connection.
--  ``basedn``: The base DN (Distinguished Name) for LDAP queries.
+- ``server``: LDAP server hostname or IP.
+- ``port``: 389 (LDAP) or 636 (LDAPS).
+- ``ssl``: ``yes`` to use LDAPS.
+- ``starttls``: ``yes`` to upgrade a plain connection.
+- ``basedn``: Base DN for searches.
 
 Auth Section
 ------------
 
--  ``user``: The username for binding to the LDAP server. Leave blank for anonymous binding.
--  ``password``: The password for binding to the LDAP server. Leave blank if using anonymous or GSSAPI authentication.
--  ``file``: Path to a file containing credentials if not specified directly.
--  ``gssapi``: Set to ``yes`` to enable GSSAPI authentication.
+- ``user``: Bind DN or user principal; blank for anonymous.
+- ``password``: Password; not required for GSSAPI or anonymous.
+- ``password-cmd``: Command whose stdout supplies the password (first line).
+- ``file``: Path to a separate INI with an ``[auth]`` section (e.g., for secrets).
+- ``gssapi``: ``yes`` to use SASL GSSAPI (Kerberos).
 
 Query Section
 -------------
 
--  ``filter``: LDAP search filter to match entries. Leave blank to match all entries.
--  ``search-fields``: Space-separated list of fields to include in wildcard searches.
+- ``filter``: LDAP filter to pre-restrict results, e.g. ``(objectClass=person)``.
+- ``search-fields``: Space-separated fields for wildcard search.
+
+Results Section
+---------------
+
+- ``optional-column``: Name of an attribute to emit as an extra column for Mutt.
 
 Cache Section
 -------------
 
--  ``enable``: Set to ``yes`` to enable caching of query results.
--  ``path``: The directory path where cache files will be stored. If left blank, defaults to XDG standard cache location.
--  ``fields``: Specific fields to cache. If left blank, all fields from the main query block are cached.
--  ``longevity-days``: The number of days before cache entries are considered stale and invalidated.
+- ``enable``: ``yes`` to enable caching.
+- ``path``: Path to JSON cache (defaults to XDG cache dir).
+- ``fields``: Fields to cache; if blank, uses a sane default: ``mail cn displayName`` plus the optional column.
+- ``longevity-days``: Days before entries expire.
 
 System Section
 --------------
 
--  ``output-encoding``: The character encoding for output. Should match the character set expected by the application consuming the LDAP query results.
--  ``argv-encoding``: The character encoding for command-line arguments. This is a workaround for Python 2.x systems.
-
-Notes
------
-
-
--  The ``system`` section includes workarounds for Python 2.x encoding issues. These settings should match the expected encodings used by the system and the application, respectively.
--  It is important to secure the ``auth`` section, especially if a username and password are provided, to prevent unauthorized access.
--  The ``cache`` section’s settings should be adjusted based on the frequency of changes in the LDAP directory and the application’s tolerance for stale data.
-
-Installation
-============
-
-Dependencies
-------------
-
-If you're installing by hand or packaging Mutt-LDAP for another
-distribution, you'll need the following dependencies:
-
-============  ====================  =========== ============ ======================
-Package       Purpose               Debian_     Opensuse_    Gentoo_
-============  ====================  =========== ============ ======================
-python-ldap_  LDAP connections      python-ldap python-ldap  dev-python/python-ldap
-PyXDG_        Optional XDG support  python-xdg  python-pyxdg dev-python/pyxdg
-============  ====================  =========== ============ ======================
-
-Installing by hand
-------------------
-
-Using pipx_
-
-  $ pipx install git+https://github.com/wberrier/mutt-ldap/
-
-or, clone the Git_ repository::
-
-  $ git clone https://github.com/wberrier/mutt-ldap/
-
-and run the standard::
-
-  $ python setup.py install
-
-Or you can just copy ``mutt_ldap.py`` into to your ``PATH``.
+- ``output-encoding``: Encoding for stdout (match Mutt’s charset).
+- ``argv-encoding``: Rarely needed on modern systems; provided for completeness.
 
 Licence
 =======
 
-This project is distributed under the `GNU General Public License
-Version 3`_ or greater.
+This project is distributed under the GNU General Public License version 3 or later.
 
 Bugs
 ====
 
-Use the `GitHub issue tracker`_ to submit bugs.
+Use the GitHub issue tracker.
 
 Related work
 ============
 
-`mutt_ldap_query`_ is a Perl script with a similar purpose.
+``mutt_ldap_query`` is a Perl script with a similar purpose.
 
-.. _external address query script:
-http://www.mutt.org/doc/manual/manual-4.html#ss4.5
-.. _Mutt: http://www.mutt.org/
-.. _LDAP: http://en.wikipedia.org/wiki/Lightweight_Directory_Access_Protocol
-.. _python-ldap: http://www.python-ldap.org/
-.. _Gentoo: http://www.gentoo.org/
-.. _layman: http://layman.sourceforge.net/
-.. _wtk overlay: http://blog.tremily.us/posts/Gentoo_overlay/
-.. _Opensuse: http://www.opensuse.org/
-.. _Debian: http://www.debian.org/
-.. _PyXDG: http://freedesktop.org/wiki/Software/pyxdg
-.. _Git: http://git-scm.com/
-.. _XDG Base Directory Specification:
-http://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html
-.. _GNU General Public License Version 3: http://www.gnu.org/licenses/gpl.html
-.. _GitHub: https://github.com/wking/mutt-ldap
-.. _GitHub issue tracker: https://github.com/wking/mutt-ldap/issues
-.. _pipx: https://github.com/pypa/pipx
-.. _mutt_ldap_query: https://github.com/namato/dotfiles/blob/e7ce282c8883dd1971356a0ea53c75b47105c8fa/scripts/ldap.pl
+References
+==========
+
+- Mutt manual, external address query: http://www.mutt.org/doc/manual/#query
+- ldap3 documentation: https://ldap3.readthedocs.io/
+- PyXDG: https://freedesktop.org/wiki/Software/pyxdg
+- XDG Base Directory Specification: https://specifications.freedesktop.org/basedir-spec/latest/
+- uv tools: https://docs.astral.sh/uv/
+- pipx: https://pypa.github.io/pipx/
+- mutt_ldap_query: https://github.com/namato/dotfiles/blob/e7ce282c8883dd1971356a0ea53c75b47105c8fa/scripts/ldap.pl
+
+# Notes on changes and rationale
+
+- Script name updated to ``mutt-ldap`` (matches entry point in pyproject).
+- Installation emphasizes isolated user-level installs via uv and pipx.
+- Dependencies updated to ``ldap3`` and ``pyxdg`` (the code uses ldap3, not python-ldap).
+- XDG paths corrected to use config dir ``~/.config/mutt-ldap/mutt-ldap.cfg`` and cache dir ``~/.cache/mutt-ldap/mutt-ldap.json`` (matches code).
+- Outdated Python 2 notes removed; project targets Python 3.7+.
+- Repository links switched to Konfekt org, consistent with pyproject.
