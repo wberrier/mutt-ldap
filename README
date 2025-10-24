@@ -53,7 +53,7 @@ Dependencies
 ============
 
 - ldap3 (Python LDAP client; no system LDAP libs required)
-- pyxdg (XDG base directory support)
+- pyxdg (for optional XDG base directory support)
 
 Both are declared as runtime dependencies and installed automatically by the methods above.
 
@@ -206,11 +206,11 @@ References
 - pipx: https://pypa.github.io/pipx/
 - mutt_ldap_query: https://github.com/namato/dotfiles/blob/e7ce282c8883dd1971356a0ea53c75b47105c8fa/scripts/ldap.pl
 
-# Notes on changes and rationale
+Notes on changes and rationale
+==========
 
 - Script name updated to ``mutt-ldap`` (matches entry point in pyproject).
 - Installation emphasizes isolated user-level installs via uv and pipx.
 - Dependencies updated to ``ldap3`` and ``pyxdg`` (the code uses ldap3, not python-ldap).
 - XDG paths corrected to use config dir ``~/.config/mutt-ldap/mutt-ldap.cfg`` and cache dir ``~/.cache/mutt-ldap/mutt-ldap.json`` (matches code).
 - Outdated Python 2 notes removed; project targets Python 3.7+.
-- Repository links switched to Konfekt org, consistent with pyproject.

@@ -10,7 +10,7 @@ build-backend = "setuptools.build_meta"
 # -------------------------------
 [project]
 name = "mutt-ldap"
-version = "0.1"
+version = "0.2"
 description = "A tool to query an LDAP server for email addresses and names, suitable for use with Mutt."
 readme = "README.rst"
 requires-python = ">=3.7"
@@ -23,7 +23,6 @@ authors = [
 ]
 maintainers = [
 { name = "W. Trevor King", email = "wking@tremily.us" },
-{ name = "Konfekt" },
 ]
 keywords = ["mutt", "ldap", "email", "addressbook"]
 classifiers = [
@@ -43,9 +42,9 @@ dependencies = [
 # -------------------------------
 [project.urls]
 Homepage = "http://blog.tremily.us/posts/mutt-ldap/"
-Repository = "https://github.com/konfekt/mutt-ldap"
-Issues = "https://github.com/konfekt/mutt-ldap/issues"
-Download = "https://github.com/konfekt/mutt-ldap/releases"
+Repository = "https://github.com/wberrier/mutt-ldap"
+Issues = "https://github.com/wberrier/mutt-ldap/issues"
+Download = "https://github.com/wberrier/mutt-ldap/releases"
 
 # -------------------------------
 # Console script entry point
