@@ -27,8 +27,9 @@ import locale as _locale
 import logging as _logging
 import os as _os
 import os.path as _os_path
-import subprocess
 import pickle as _pickle
+import shlex as _shlex
+import subprocess
 import sys as _sys
 import textwrap
 import time as _time
@@ -90,10 +91,11 @@ class Config (_configparser.ConfigParser):
         # If a password command is provided, try to execute it to get the password
         if password_cmd:
             try:
-                result = subprocess.run(password_cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-                return result.stdout.strip()
-            except subprocess.CalledProcessError as e:
-                print(f"An error occurred while executing the password command: {e}")
+                result = subprocess.run(_shlex.split(password_cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                result = result.stdout.decode('utf-8').splitlines()[0] if result.stdout else ''
+                return result.strip()
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                print(f"An error occurred while executing the password command: {e}", file=_sys.stderr)
 
         # If password command is not provided or fails, fall back to password
         return self.auth_config.get('auth', 'password', fallback=self.get('auth', 'password', fallback='')) if self.auth_config else self.get('auth', 'password', fallback='')
@@ -461,6 +463,14 @@ def main():
 
     # Configuration loading and LDAP search logic:
     CONFIG.load(args.config)
+
+    # Configure stdout encoding to match configured output encoding
+    try:
+        desired_encoding = CONFIG.get('system', 'output-encoding', fallback=_locale.getpreferredencoding(False))
+        if hasattr(_sys.stdout, 'reconfigure'):
+            _sys.stdout.reconfigure(encoding=desired_encoding)
+    except Exception as e:
+        LOG.debug(f'Could not set stdout encoding: {e}')
 
     query = ' '.join(args.query)
 
